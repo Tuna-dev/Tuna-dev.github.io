@@ -1,0 +1,262 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body>
+    <div style="width: 80%; margin: auto;">
+        <title>회사별 자금 배분 비율</title>
+        <canvas id="myChart1" width="400" height="200"></canvas>
+        <span>잉여현금 : <span id="remains"></span></span>
+        <title>목표달성률 트래킹</title>
+        <canvas id="myChart2" width="400" height="200"></canvas>
+    </div>
+    <script>
+        var totalSeed = 31500000 + 1082241 + 6000000;
+        var dataset = [
+            {
+                "id":"naver",
+                "per":17.42,
+                "eps":112.86,
+                "price":174900
+            },
+            {
+                "id":"메리츠",
+                "per":7.36,
+                "eps":23.88,
+                "price":103300
+            },
+            {
+                "id":"크래프톤",
+                "per":17.73,
+                "eps":98.28,
+                "price":341500
+            },
+            {
+                "id":"kt&g",
+                "per":11.58,
+                "eps":22.21,
+                "price":105800
+            }
+        ];
+
+        // 각 객체에 point 값을 추가
+        for (var i = 0; i < dataset.length; i++) {
+            var data = dataset[i];
+            dataset[i].point = data.eps * (30 - data.per);
+        }
+
+        // 총 point 값 계산
+        var totalPoint = dataset.reduce((sum, data) => sum + data.point, 0);
+
+        // 각 객체에 자금 배분 비율 추가 (총 100%)
+        for (var i = 0; i < dataset.length; i++) {
+            dataset[i].allocation = (dataset[i].point / totalPoint) * 100;
+        }
+
+        // 각 객체에 목표보유갯수 추가
+        var seedSum = 0;
+        for (var i = 0; i < dataset.length; i++) {
+            dataset[i].count = Math.floor((totalSeed * dataset[i].allocation / 100) / dataset[i].price);
+            seedSum += dataset[i].count * dataset[i].price;
+        }
+
+        // 잔여 금액 계산
+        var remains = totalSeed - seedSum;
+
+        // 남은 금액을 이용해 추가로 주식을 구매
+        while (remains > 0) {
+            let bought = false;
+            for (var i = 0; i < dataset.length; i++) {
+                // 현재 남은 금액으로 해당 주식 한 주를 살 수 있는지 확인
+                if (remains >= dataset[i].price) {
+                    dataset[i].count++; // 주식 한 주 더 구매
+                    remains -= dataset[i].price; // 잔여 금액에서 주식 가격만큼 차감
+                    bought = true;
+                }
+            }
+            if (!bought) break; // 더 이상 살 수 없으면 반복 중단
+        }
+
+        document.getElementById("remains").innerText = remains;
+
+        // point 값을 기준으로 정렬
+        dataset.sort((a, b) => b.point - a.point);
+
+        // Chart.js를 사용하여 첫 번째 그래프 그리기
+        var ctx = document.getElementById('myChart1').getContext('2d');
+        var myChart1 = new Chart(ctx, {
+            type: 'bar',
+            data: {
+                labels: dataset.map(data => data.id),
+                datasets: [
+                    {
+                        label: '자금 배분 비율 (원)',
+                        data: dataset.map(data => data.count * data.price),
+                        backgroundColor: 'rgba(75, 192, 192, 0.6)',
+                        borderColor: 'rgba(75, 192, 192, 1)',
+                        borderWidth: 1,
+                        yAxisID: 'y' // 첫 번째 y축 사용
+                    },
+                    {
+                        label: '목표 보유 갯수',
+                        data: dataset.map(data => data.count),
+                        backgroundColor: 'rgba(153, 102, 255, 0.6)',
+                        borderColor: 'rgba(153, 102, 255, 1)',
+                        borderWidth: 1,
+                        yAxisID: 'y1' // 두 번째 y축 사용
+                    }
+                ]
+            },
+            options: {
+                responsive: true,
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        title: {
+                            display: true,
+                            text: '자금 배분 비율 (원)'
+                        },
+                        position: 'left', // 왼쪽 y축
+                    },
+                    y1: {
+                        beginAtZero: true,
+                        title: {
+                            display: true,
+                            text: '목표 보유 갯수'
+                        },
+                        position: 'right', // 오른쪽 y축
+                        grid: {
+                            drawOnChartArea: false // 오른쪽 축의 그리드를 숨김
+                        }
+                    }
+                },
+                plugins: {
+                    title: {
+                        display: true,
+                        text: '회사별 자금 배분 비율 및 목표 보유 갯수'
+                    },
+                    tooltip: {
+                        callbacks: {
+                            label: function(context) {
+                                return `${context.dataset.label}: ${context.parsed.y.toFixed(2)}`;
+                            }
+                        }
+                    }
+                }
+            }
+        });
+
+        // dataset2 초기화 및 데이터 생성 부분
+        var dataset2 = [];
+        var targetGrowth = 1.004867;
+        var targetSave = 0.03;
+        var lastMoney = 1;
+        var monthlyInflationRate = 1.0020593; // 월간 인플레이션 0.20593%
+        var targetFinalMoney = 8.6; // 현재기준 금액 
+
+        // 월별 인플레이션을 누적 적용하여 각 월에 목표 금액을 조정
+        function inflationAdjustedTarget(futureValue, inflationRate, monthsElapsed) {
+            return futureValue * Math.pow(inflationRate, monthsElapsed);
+        }
+
+        // 현재부터 2040년 12월까지 남은 월 수 계산
+        const currentYear = new Date().getFullYear();
+        const currentMonth = new Date().getMonth();
+        const monthsTo2040 = (2040 - currentYear) * 12 + (11 - currentMonth); // 2040년 12월 기준
+
+        function getMonthlyDatesForYears() {
+            const startDate = new Date(2024, 0, 1);
+            const endDate = new Date(2040, 11, 1);
+            const monthlyDates = [];
+
+            let currentDate = startDate;
+            while (currentDate < endDate) {
+                monthlyDates.push(new Date(currentDate));
+                currentDate.setMonth(currentDate.getMonth() + 1);
+            }
+
+            return monthlyDates;
+        }
+
+        const dates = getMonthlyDatesForYears();
+        dates.forEach((date, i) => {
+            dataset2.push({
+                date: date.toLocaleDateString('ko-KR', { year: 'numeric', month: 'long' }),
+                targetMoney: lastMoney * targetGrowth + targetSave,
+                inflationAdjustedTarget: inflationAdjustedTarget(targetFinalMoney, monthlyInflationRate, i)
+            });
+            lastMoney = dataset2[i].targetMoney;
+        });
+
+        // 현재 데이터 추가
+        const currentDatas = [1.0528, 1.1169, 1.3605, 1.3735, 1.4628, 1.5291, 1.5717, 1.6110, 1.6479];
+        for (let i = 0; i < currentDatas.length; i++) {
+            dataset2[i].currentMoney = currentDatas[i];
+        }
+
+        // Chart.js를 사용하여 두 번째 그래프 그리기
+        var ctx2 = document.getElementById('myChart2').getContext('2d');
+        var myChart2 = new Chart(ctx2, {
+            type: 'line',
+            data: {
+                labels: dataset2.map(data => data.date),
+                datasets: [
+                    {
+                        label: '목표 금액',
+                        data: dataset2.map(data => data.targetMoney),
+                        borderColor: 'rgba(75, 192, 192, 1)',
+                        backgroundColor: 'rgba(75, 192, 192, 0.2)',
+                        fill: true,
+                        tension: 0.1
+                    },
+                    {
+                        label: '현재 금액',
+                        data: dataset2.map(data => data.currentMoney),
+                        borderColor: 'rgba(255, 99, 132, 1)',
+                        backgroundColor: 'rgba(255, 99, 132, 0.2)',
+                        fill: true,
+                        tension: 0.1
+                    },
+                    {
+                        label: '인플레이션 감안 목표 금액',
+                        data: dataset2.map(data => data.inflationAdjustedTarget),
+                        borderColor: 'rgba(54, 162, 235, 1)',
+                        backgroundColor: 'rgba(54, 162, 235, 0.2)',
+                        fill: true,
+                        tension: 0.1,
+                        borderDash: [10, 5]
+                    }
+                ]
+            },
+            options: {
+                responsive: true,
+                scales: {
+                    y: {
+                        beginAtZero: false,
+                        title: {
+                            display: true,
+                            text: '금액 (단위: 억)'
+                        }
+                    }
+                },
+                plugins: {
+                    title: {
+                        display: true,
+                        text: '목표달성률 트래킹 및 인플레이션 감안 목표선'
+                    },
+                    tooltip: {
+                        callbacks: {
+                            label: function(context) {
+                                return `${context.dataset.label}: ${context.parsed.y.toFixed(4)}`;
+                            }
+                        }
+                    }
+                }
+            }
+        });
+    </script>
+</body>
+</html>
