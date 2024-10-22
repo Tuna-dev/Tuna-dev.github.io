@@ -12,6 +12,7 @@
         <span>잉여현금 : <span id="remains"></span></span>
         <title>목표달성률 트래킹</title>
         <canvas id="myChart2" width="400" height="200"></canvas>
+        <span>목표달성률 : <span id="goalAchievementRate"></span>%</span>
     </div>
     <script>
         var totalSeed = 32579844 + 6184500;
@@ -202,7 +203,9 @@
         for (let i = 0; i < currentDatas.length; i++) {
             dataset2[i].currentMoney = currentDatas[i];
         }
-
+        //목표달성률 (현재)
+        const goalAchievementRate = dataset2[currentDatas.length-1].currentMoney / dataset2[currentDatas.length-1].inflationAdjustedTarget * 100;
+        document.getElementById("goalAchievementRate").innerText = Math.round(goalAchievementRate * 10) / 10;
         // Chart.js를 사용하여 두 번째 그래프 그리기
         var ctx2 = document.getElementById('myChart2').getContext('2d');
         var myChart2 = new Chart(ctx2, {
