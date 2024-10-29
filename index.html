@@ -14,6 +14,13 @@
         <canvas id="myChart2" width="400" height="200"></canvas>
         <p><span>목표달성률 : <span id="goalAchievementRate"></span>%</span></p>
         <p><span>기준값 대비 "<span id="goalOverPerformRate"></span>%" 초과달성 상황입니다.</span></p>
+
+        <!-- 기간 선택 입력 추가 -->
+        <label for="startDate">조회 시작 날짜:</label>
+        <input type="month" id="startDate" value="2024-01">
+        <label for="endDate">조회 종료 날짜:</label>
+        <input type="month" id="endDate" value="2040-12">
+        <button onclick="updateChart()">조회</button>
     </div>
     <script>
         var totalSeed = 32579844 + 6184500;
@@ -49,6 +56,35 @@
                 "price":309000
             }
         ];
+        
+        // 차트 데이터를 업데이트하는 함수
+        function updateChart() {
+            // 입력된 시작 및 종료 날짜 가져오기
+            const startDate = new Date(document.getElementById("startDate").value);
+            startDate.setHours(0, 0, 0, 0);
+            const endDateInput = document.getElementById("endDate").value.split("-");
+            const endYear = parseInt(endDateInput[0]);
+            const endMonth = parseInt(endDateInput[1]);
+            const endDate = new Date(endYear, endMonth, 0);
+            startDate.setHours(0, 0, 0, 0);
+
+            // 선택된 기간에 맞게 dataset2 데이터 필터링
+            const filteredData = dataset2.filter(data => {
+                const [year, month] = data.date.split('년 ');
+                const formattedDate = new Date(parseInt(year), parseInt(month.replace('월', '').trim()) - 1, 1);
+                formattedDate.setHours(0, 0, 0, 0);
+                return formattedDate.getTime() >= startDate.getTime() && formattedDate.getTime() <= endDate.getTime();
+            });
+
+            
+            // 필터링된 데이터로 차트 업데이트
+            myChart2.data.labels = filteredData.map(data => data.date);
+            myChart2.data.datasets[0].data = filteredData.map(data => data.targetMoney);
+            myChart2.data.datasets[1].data = filteredData.map(data => data.currentMoney);
+            myChart2.data.datasets[2].data = filteredData.map(data => data.inflationAdjustedTarget);
+
+            myChart2.update(); // 차트 업데이트
+        }
 
         // 각 객체에 point 값을 추가
         for (var i = 0; i < dataset.length; i++) {
