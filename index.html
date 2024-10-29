@@ -12,7 +12,8 @@
         <span>잉여현금 : <span id="remains"></span></span>
         <title>목표달성률 트래킹</title>
         <canvas id="myChart2" width="400" height="200"></canvas>
-        <span>목표달성률 : <span id="goalAchievementRate"></span>%</span>
+        <p><span>목표달성률 : <span id="goalAchievementRate"></span>%</span></p>
+        <p><span>기준값 대비<span id="goalOverPerformRate"></span>% 초과달성 상황입니다.</span></p>
     </div>
     <script>
         var totalSeed = 32579844 + 6184500;
@@ -199,13 +200,17 @@
         });
 
         // 현재 데이터 추가
-        const currentDatas = [1.0528, 1.1169, 1.3605, 1.3735, 1.4628, 1.5291, 1.5717, 1.6110, 1.6479, 1.7191];
+        const currentDatas = [1.0528, 1.1169, 1.3605, 1.3735, 1.4628, 1.5291, 1.5717, 1.6110, 1.6479, 1.6969];
         for (let i = 0; i < currentDatas.length; i++) {
             dataset2[i].currentMoney = currentDatas[i];
         }
         //목표달성률 (현재)
-        const goalAchievementRate = dataset2[currentDatas.length-1].currentMoney / dataset2[currentDatas.length-1].inflationAdjustedTarget * 100;
+        const lastData = dataset2[currentDatas.length-1];
+        const goalAchievementRate = lastData.currentMoney / lastData.inflationAdjustedTarget * 100;
         document.getElementById("goalAchievementRate").innerText = Math.round(goalAchievementRate * 10) / 10;
+        //기준대비 달성률(현재)
+        const goalOverPerformRate = (lastData.currentMoney - lastData.targetMoney)/ lastData.targetMoney * 100;
+        document.getElementById("goalOverPerformRate").innerText = Math.round(goalOverPerformRate * 10) / 10;
         // Chart.js를 사용하여 두 번째 그래프 그리기
         var ctx2 = document.getElementById('myChart2').getContext('2d');
         var myChart2 = new Chart(ctx2, {
