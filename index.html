@@ -97,6 +97,8 @@
 
             myChart2.update(); // 차트 업데이트
         }
+        
+        dataset = dataset.filter(item => item.eps >= item.per);
 
         // 각 객체에 point 값을 추가
         for (var i = 0; i < dataset.length; i++) {
