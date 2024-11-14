@@ -24,50 +24,51 @@
         <button onclick="updateChart()">조회</button>
     </div>
     <script>
-        var totalSeed = 13360800 + 10240000 + 6664000 + 5073600 + 4334400 + 1000000;
-        var dataset = [
+        var totalSeed = 39445900 + 1000000;
+        var dataset = 
+        [
             {
                 "id":"신한",
-                "per":6.55,
-                "eps":13.33,
-                "price":56300
+                "per":6.52,
+                "eps":9.07,
+                "price":56100
             },
             {
                 "id":"네이버",
-                "per":16.71,
-                "eps":94.04,
-                "price":182100
+                "per":17.06,
+                "eps":109.77,
+                "price":185900
             },
             {
                 "id":"메리츠",
-                "per":7.51,
-                "eps":23.23,
-                "price":105900
+                "per":7.27,
+                "eps":16.02,
+                "price":102500
             },
             {
                 "id":"하나",
-                "per":5.04,
-                "eps":0.65,
-                "price":62000
+                "per":4.9,
+                "eps":-0.65,
+                "price":60300
             },
             {
-                "id":"크래프톤",
-                "per":17.46,
-                "eps":81.6,
-                "price":305500
+                "id":"크래",
+                "per":16.86,
+                "eps":80.67,
+                "price":295000
             },
             {
-                "id":"케이티엔지",
-                "per":14.85,
-                "eps":28.09,
-                "price":121800
+                "id":"케이티",
+                "per":14.74,
+                "eps":26.93,
+                "price":120900
             },
             {
-                "id":"카뱅",
-                "per":23.17,
-                "eps":26.83,
-                "price":20850
-            }
+                "id":"현일",
+                "per":26.5,
+                "eps":206.55,
+                "price":371000
+            },
         ];
         
         // 차트 데이터를 업데이트하는 함수
@@ -100,7 +101,7 @@
         }
         
         dataset = dataset.filter(item => item.eps >= item.per);
-        
+        dataset = dataset.filter(item => item.per <= 25);
         // 각 객체에 targetPrice 값을 추가
         for (var i = 0; i < dataset.length; i++) {
             var data = dataset[i];
