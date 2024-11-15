@@ -112,7 +112,7 @@
         for (var i = 0; i < dataset.length; i++) {
             var data = dataset[i];
             var multiple = Math.min(data.eps,  25);
-            dataset[i].targetPrice = data.price / data.per * multiple;
+            dataset[i].targetPrice = data.price * Math.sqrt(multiple/ data.per);
         }
         // 각 객체에 point 값을 추가
         for (var i = 0; i < dataset.length; i++) {
@@ -160,7 +160,7 @@
         for (var i = 0; i < dataset.length; i++) {
             var data = dataset[i];
             targetPriceHtml += '<p>';
-            targetPriceHtml += data.id + ': ' +data.price + " >> " + round(data.targetPrice,0) + ' ('+ round((data.targetPrice - data.price)/data.targetPrice *100,1)+ '%)' ;
+            targetPriceHtml += data.id + ': ' +data.price + " >> " + round(data.targetPrice,0) + ' ('+ round((data.targetPrice - data.price)/data.price *100,1)+ '%)' ;
             targetPriceHtml += '</p>';
         }
         document.getElementById("targetPrice").innerHTML = targetPriceHtml;
