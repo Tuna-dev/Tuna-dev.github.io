@@ -11,6 +11,7 @@
         <h1>회사별 자금 배분 비율</h1>
         <canvas id="myChart1" width="400" height="200"></canvas>
         <span>잉여현금 : <span id="remains"></span></span></br></br>
+        <span>총 평가금 : <span id="totalSeed"></span></span></br></br>
         <span>종목별 목표주가 : <span id="targetPrice"></span></span>
         <h2>목표달성률 트래킹</h2>
         <canvas id="myChart2" width="400" height="200"></canvas>
@@ -24,47 +25,49 @@
     </div>
 
     <script>
-        const totalSeed = 39048500 + 1149275;
+        let totalSeed = 3000000;
         let dataset = [];
         let dataset2 = []; 
-        const currentDatas = [1.0528, 1.1169, 1.3605, 1.3735, 1.4628, 1.5291, 1.5717, 1.6110, 1.6479, 1.7004, 1.7663];
+        const currentDatas = [1.0528, 1.1169, 1.3605, 1.3735, 1.4628, 1.5291, 1.5717, 1.6110, 1.6479, 1.7004, 1.7990];
         var myChart2;
         const stocks = [
-            { name: "신한", eps: 8600, ticker: "055550", before1: 3538, before2: 14143, before3: 12687, before4: 12188, after1: 5760, after2: 13478, after3: 14509, after4: 12669 },
-            { name: "네이버", eps: 10900, ticker: "035420", before1: 1317, before2: 436, before3: 2867, before4: 3562, after1: 2984, after2: 5558, after3: 3320, after4: 5301 },
-            { name: "메리츠", eps: 12300, ticker: "138040", before1: 2637, before2: 6036, before3: 5766, before4: 5801, after1: 3649, after2: 5912, after3: 7361, after4: 6560 },
-            { name: "크래", eps: 17500, ticker: "259960", before1: -1654, before2: 2672, before3: 1285, before4: 2115, after1: -132, after2: 3486, after3: 3414, after4: 1214 },
-            { name: "케이티", eps: 8200, ticker: "033780", before1: -600, before2: 2742, before3: 2019, before4: 3332, after1: 1129, after2: 2856, after3: 3127, after4: 2399 },
-            { name: "HMM", eps: 14150, ticker: "011200", before1: 14150, before2: 2853, before3: 3128, before4: 954, after1: 2629, after2: 4850, after3: 6607, after4: 17380 },
+            { name: "신한", eps: 8600, ticker: "055550", before1: 3538, before2: 14143, before3: 12687, before4: 12188, after1: 5760, after2: 13478, after3: 14509, after4: 12669, count: 34},
+            { name: "네이버", eps: 10900, ticker: "035420", before1: 1317, before2: 436, before3: 2867, before4: 3562, after1: 2984, after2: 5558, after3: 3320, after4: 5301, count: 62},
+            { name: "메리츠", eps: 12300, ticker: "138040", before1: 2637, before2: 6036, before3: 5766, before4: 5801, after1: 3649, after2: 5912, after3: 7361, after4: 6560, count: 29},
+            { name: "크래", eps: 17500, ticker: "259960", before1: -1654, before2: 2672, before3: 1285, before4: 2115, after1: -132, after2: 3486, after3: 3414, after4: 1214, count: 32},
+            { name: "케이티", eps: 8200, ticker: "033780", before1: -600, before2: 2742, before3: 2019, before4: 3332, after1: 1129, after2: 2856, after3: 3127, after4: 2399, count: 30},
+            { name: "HMM", eps: 4240, ticker: "011200", before1: 14150, before2: 2853, before3: 3128, before4: 954, after1: 2629, after2: 4850, after3: 6607, after4: 17380, count: 585},
+            { name: "HD현일", eps: 14000, ticker: "267260", before1: 460, before2: 288, before3: 374, before4: 542, after1: 1389, after2: 934, after3: 1612, after4: 1166, count: 0},
+            { name: "삼성화재우", eps: 48000, ticker: "000815", before1: 1790, before2: 6133, before3: 6022, before4: 4286, after1: 1783, after2: 7019, after3: 6124, after4: 5545, count: 0},
+            
         ];
 
         async function fetchStockData(stocks) {
-            const baseUrl = "https://finance.naver.com/item/main.nhn?code=";
-
+            //const baseUrl = "https://finance.naver.com/item/main.nhn?code=";
+            const baseUrl = "https://yfapi.net/v6/finance/quote";
             for (let stock of stocks) {
-                const url = `${baseUrl}${stock.ticker}`;
-                try {
-                    const response = await axios.get(url);
-                    const parser = new DOMParser();
-                    const doc = parser.parseFromString(response.data, "text/html");
-
-                    const priceElement = doc.querySelector(".no_today .blind");
-                    if (priceElement) {
-                        stock.price = parseFloat(priceElement.textContent.replace(/,/g, ''));
-                    } else {
-                        console.error(`Price element not found for ${stock.name}`);
-                        stock.price = 0;
+                var options = {
+                    method: 'GET',
+                    url: baseUrl,
+                    params: {symbols: stock.ticker+'.KS' , region:'US'},
+                    headers: {
+                        'x-api-key': 'g7hNE2dzy7fi3YaIlt2q8TmF6cv1SfH3lKZH8zx6'
                     }
-
+                };
+                const response = await axios.request(options).then(function (response) {
+                    const data = response.data;
+                    console.log(response.data);
+                    stock.price = data.quoteResponse.result[0].regularMarketPrice;
+                    totalSeed += stock.price*stock.count
                     stock.id = stock.name;
                     stock.per = round(stock.price / stock.eps, 2);
 
                     const beforeTotal = stock.before1 + stock.before2 + stock.before3 + stock.before4;
                     const afterTotal = stock.after1 + stock.after2 + stock.after3 + stock.after4;
                     stock.eps = round(((afterTotal - beforeTotal) / beforeTotal) * 100, 2);
-                } catch (error) {
-                    console.error(`Error fetching data for ${stock.name}:`, error.message);
-                }
+                }).catch(function (error) {
+                    console.error(error);
+                });
             }
 
             return stocks;
@@ -84,16 +87,16 @@
 
             dataset.forEach(stock => {
                 stock.allocation = (stock.point / totalPoint) * 100;
-                stock.count = Math.floor((totalSeed * stock.allocation / 100) / stock.price);
+                stock.targetCount = Math.floor((totalSeed * stock.allocation / 100) / stock.price);
             });
 
-            let remains = totalSeed - dataset.reduce((sum, stock) => sum + (stock.count * stock.price), 0);
+            let remains = totalSeed - dataset.reduce((sum, stock) => sum + (stock.targetCount * stock.price), 0);
 
             while (remains > 0) {
                 let bought = false;
                 for (let stock of dataset) {
                     if (remains >= stock.price) {
-                        stock.count++;
+                        stock.targetCount++;
                         remains -= stock.price;
                         bought = true;
                     }
@@ -102,8 +105,9 @@
             }
             // point 값을 기준으로 정렬
             dataset.sort((a, b) => b.point - a.point);
-            document.getElementById("remains").innerText = remains.toFixed(2);
-
+            document.getElementById("remains").innerText = remains.toLocaleString();
+            document.getElementById("totalSeed").innerText = totalSeed.toLocaleString();
+            
             let targetPriceHtml = "";
             dataset.forEach(stock => {
                 targetPriceHtml += `<p>${stock.id}: ${stock.price} → ${round(stock.targetPrice, 0)} (${round((stock.targetPrice - stock.price) / stock.price * 100, 1)}%)</p>`;
@@ -118,14 +122,21 @@
                     datasets: [
                         {
                             label: "자금 배분 비율 (원)",
-                            data: dataset.map(stock => stock.count * stock.price),
+                            data: dataset.map(stock => (stock.targetCount * stock.price)/totalSeed*100),
                             backgroundColor: "rgba(75, 192, 192, 0.6)",
                             borderColor: "rgba(75, 192, 192, 1)",
                             yAxisID: 'y',
                         },
                         {
-                            label: "목표 보유 갯수",
+                            label: "현재 보유 갯수",
                             data: dataset.map(stock => stock.count),
+                            backgroundColor: "rgba(255, 165, 0, 0.6)", 
+                            borderColor: "rgba(255, 165, 0, 1)", 
+                            yAxisID: 'y1',
+                        },
+                        {
+                            label: "목표 보유 갯수",
+                            data: dataset.map(stock => stock.targetCount),
                             backgroundColor: "rgba(153, 102, 255, 0.6)",
                             borderColor: "rgba(153, 102, 255, 1)",
                             yAxisID: 'y1',
