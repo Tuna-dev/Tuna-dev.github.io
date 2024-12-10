@@ -45,8 +45,13 @@
         ];
         async function fetchStockData(stocks) {
             const baseUrl = "https://yfapi.net/v6/finance/quote";
-            
+            const availableKeys = [...apikeyList];
+            let currentIndex = 0;
             function getNextApiKey() {
+                if (availableKeys.length === 0) {
+                    console.log("모든 API 키가 제한에 도달했습니다.");
+                    throw new Error("모든 API 키가 제한에 도달했습니다.");
+                }
                 currentKeyindex = (currentKeyindex + 1) % apikeyList.length;
                 return apikeyList[currentKeyindex];
             }
@@ -54,20 +59,21 @@
             for (let stock of stocks) {
                 let success = false;
                 while (!success) {
+                    console.log("시도중")
+                    const apiKey = getNextApiKey();
                     var baseOptions = {
                         method: 'GET',
                         url: baseUrl,
                         params: {symbols: stock.ticker+'.KS' , region:'US'},
                         headers: {
-                            'x-api-key': apikeyList[currentKeyindex]
+                            'x-api-key': apiKey
                         }
                     };
-
+                    console.log(baseOptions)
 
                     await axios.request(baseOptions).then(function (response) {
                         const data = response.data;
                         stock.price = data.quoteResponse.result[0].regularMarketPrice;
-                        stock.eps = data.quoteResponse.result[0].epsTrailingTwelveMonths;
 
                         totalSeed += stock.price*stock.count
                         stock.id = stock.name;
@@ -76,14 +82,17 @@
                         const beforeTotal = stock.before1 + stock.before2 + stock.before3 + stock.before4;
                         const afterTotal = stock.after1 + stock.after2 + stock.after3 + stock.after4;
                         stock.eps = round(((afterTotal - beforeTotal) / beforeTotal) * 100, 2);
+                        
                         success = true; // 요청 성공 시 반복 종료
                     }).catch(function (error) {
-                        console.error(error);
-                        getNextApiKey(); // 에러 발생 시 API 키 교체
+                        console.error(`Error fetching data for ${stock.name} with API key: ${apiKey}`);
+                        // 현재 API 키를 사용 불가능 상태로 만들기
+                        availableKeys.splice(currentIndex, 1);
+                        currentIndex--; // 다음 키로 넘어가야 하므로 인덱스 조정
                     });
                 }
             }
-
+            console.log(stocks)
             return stocks;
         }
 
