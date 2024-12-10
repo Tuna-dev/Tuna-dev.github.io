@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body>
+    <div style="width: 80%; margin: auto;">
+        <h1>해외주식 포트폴리오 관리</h1>
+        <canvas id="myChart1" width="400" height="200"></canvas>
+        <span>변동내역 : <span id="change"></span></span></br></br>
+        <span>환헷지 전략 : <span id="exchange"></span></span></br></br>
+    </div>
+
+    <script>
+
+        var etfName =  ['SPY', 'TLT', 'EPI', 'MOAT', 'ASOX']; 
+        var hedgeRatio = 0.45;
+        var indiaRatio = 0.1;
+        var moatRatio = 0.1;
+        var stockRatio = 0.25;
+        var ASOXRATIO = 0.1;
+        var etfRatio = [stockRatio ,hedgeRatio, indiaRatio, moatRatio, ASOXRATIO];
+
+        var dolorStock = [4084852,50136931,10689667,10680357,0];
+        var krwStock = [(20447310+2226000),1996560,0,0,7423650];
+
+        var exchangeRate = 1427;
+        var exchangeRate365 = 1342;
+
+        var curStock = dolorStock.map((num, index) => num + krwStock[index]);
+        var moveStock = [0,0,0,0,0];
+        var afterStock = [0,0,0,0,0];
+        // 현재 현금 입력 (환전 후 달러예수금)
+        var dolorAcc = 0;
+
+        // 적정 리밸런싱금액보다 10프로 더 많은 경우 해당 자산을 리밸런싱자산으로 재편성함
+        var shouldRebalance = function(totalValue, curruntValue, curruntRatio){
+            if((totalValue * curruntRatio * 1.1) < curruntValue ){
+                return true;
+            }else{
+                return false;
+            }
+        } 
+        var rebalanceAmount = function (totalValue, curruntValue, curruntRatio){
+            return curruntValue - (totalValue * curruntRatio) 
+        }
+        var beforeTotal = curStock.reduce((a,b) => (a+b));
+        var totalValue = beforeTotal + dolorAcc;
+        for( var i = 0; i < curStock.length; i++){
+            if(shouldRebalance(totalValue, curStock[i], etfRatio[i])){
+                var amount = rebalanceAmount(totalValue, curStock[i], etfRatio[i]);
+                moveStock[i] -= amount;
+                dolorAcc += amount;
+            }
+        }
+        // afterStock 정산
+        for(var i = 0; i < curStock.length; i++){
+            afterStock[i] = curStock[i] + moveStock[i];
+        }
+        // 가장 시급한 자산을 판단해주는 함수
+        var chooseValance = function( afterStock , etfRatio){
+            var retIdx = 0;
+            var minVal = null;
+            var curVal = 0;
+            for(var i = 0; i < curStock.length; i++){
+                curVal = afterStock[i]/etfRatio[i];
+                if( minVal == null || minVal >= curVal){
+                    retIdx = i;
+                    minVal = curVal;
+                }
+            }
+            return retIdx;
+        }
+        //시급한 것부터 하나씩 처리
+        for( var i = dolorAcc; i > 0; i--){
+            var idx = chooseValance(afterStock , etfRatio);
+            moveStock[idx] += 1;
+            afterStock[idx] += 1;
+        }
+
+        // 초기 dataset 배열 생성
+        let dataset = etfName.map((data, i) => ({
+            id: data,
+            holdRate: 0,
+            moveStock: 0,
+            beforeStock: 0,
+        }));
+
+        // 데이터셋 업데이트
+        for (let i = 0; i < etfName.length; i++) {
+            dataset[i].moveStock = moveStock[i];
+            dataset[i].beforeStock = curStock[i];
+            
+        }
+
+        const ctx1 = document.getElementById("myChart1").getContext("2d");
+        new Chart(ctx1, {
+            type: "bar",
+            data: {
+                labels: dataset.map(stock => stock.id),
+                datasets: [
+                    {
+                        label: "현재 보유 금액",
+                        data: dataset.map(stock => stock.beforeStock),
+                        backgroundColor: "rgba(255, 165, 0, 0.6)", 
+                        borderColor: "rgba(255, 165, 0, 1)", 
+                        yAxisID: 'y1',
+                    },
+                    {
+                        label: "변동금액",
+                        data: dataset.map(stock => stock.moveStock),
+                        backgroundColor: "rgba(153, 102, 255, 0.6)",
+                        borderColor: "rgba(153, 102, 255, 1)",
+                        yAxisID: 'y1',
+                    },
+                ],
+            },
+            options: {
+                responsive: true,
+                scales: {
+                    y1: {
+                        beginAtZero: true,
+                        title: {
+                            display: true,
+                            text: '금액'
+                        },
+                        position: 'right', // 오른쪽 y축
+                        grid: {
+                            drawOnChartArea: false // 오른쪽 축의 그리드를 숨김
+                        }
+                    }
+                },
+                plugins: {
+                    title: {
+                        display: true,
+                        text: "자금 배분 비율 및 목표 보유 금액",
+                    },
+                },
+            },
+        });
+        let changeHtml = "";
+        dataset.forEach(stock => {
+            if(stock.moveStock != 0){
+                changeHtml += `<p>${stock.id}: ${stock.moveStock} </p>`;
+            }else{
+                changeHtml += `<p>${stock.id}: 없음 </p>`;
+            }
+        });
+        document.getElementById("change").innerHTML = changeHtml;
+
+        let exchangeHtml = "";
+        var exchangeRate = 1427;
+        var exchangeRate365 = 1342;
+        if(exchangeRate < exchangeRate365*0.95){
+            exchangeHtml = "전량 언헷지 전환";
+        }else if(exchangeRate < exchangeRate365*1.025){
+            exchangeHtml = "언헷지 매입";
+        }else if(exchangeRate < exchangeRate365*1.1){
+            exchangeHtml = "헷지(H) 매입";
+        }else{
+            exchangeHtml = "전량 헷지(H) 전환";
+        }
+        document.getElementById("exchange").innerHTML = exchangeHtml;
+    </script>
+</body>
+</html>
