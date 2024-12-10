@@ -46,34 +46,42 @@
         async function fetchStockData(stocks) {
             const baseUrl = "https://yfapi.net/v6/finance/quote";
             
-            
+            function getNextApiKey() {
+                currentKeyindex = (currentKeyindex + 1) % apikeyList.length;
+                return apikeyList[currentKeyindex];
+            }
             
             for (let stock of stocks) {
-                var baseOptions = {
-                    method: 'GET',
-                    url: baseUrl,
-                    params: {symbols: stock.ticker+'.KS' , region:'US'},
-                    headers: {
-                        'x-api-key': 'g7hNE2dzy7fi3YaIlt2q8TmF6cv1SfH3lKZH8zx6'
-                    }
-                };
+                let success = false;
+                while (!success) {
+                    var baseOptions = {
+                        method: 'GET',
+                        url: baseUrl,
+                        params: {symbols: stock.ticker+'.KS' , region:'US'},
+                        headers: {
+                            'x-api-key': apikeyList[currentKeyindex]
+                        }
+                    };
 
 
-                await axios.request(baseOptions).then(function (response) {
-                    const data = response.data;
-                    stock.price = data.quoteResponse.result[0].regularMarketPrice;
-                    stock.eps = data.quoteResponse.result[0].epsTrailingTwelveMonths;
+                    await axios.request(baseOptions).then(function (response) {
+                        const data = response.data;
+                        stock.price = data.quoteResponse.result[0].regularMarketPrice;
+                        stock.eps = data.quoteResponse.result[0].epsTrailingTwelveMonths;
 
-                    totalSeed += stock.price*stock.count
-                    stock.id = stock.name;
-                    stock.per = round(stock.price / stock.eps, 2);
+                        totalSeed += stock.price*stock.count
+                        stock.id = stock.name;
+                        stock.per = round(stock.price / stock.eps, 2);
 
-                    const beforeTotal = stock.before1 + stock.before2 + stock.before3 + stock.before4;
-                    const afterTotal = stock.after1 + stock.after2 + stock.after3 + stock.after4;
-                    stock.eps = round(((afterTotal - beforeTotal) / beforeTotal) * 100, 2);
-                }).catch(function (error) {
-                    console.error(error);
-                });
+                        const beforeTotal = stock.before1 + stock.before2 + stock.before3 + stock.before4;
+                        const afterTotal = stock.after1 + stock.after2 + stock.after3 + stock.after4;
+                        stock.eps = round(((afterTotal - beforeTotal) / beforeTotal) * 100, 2);
+                        success = true; // 요청 성공 시 반복 종료
+                    }).catch(function (error) {
+                        console.error(error);
+                        getNextApiKey(); // 에러 발생 시 API 키 교체
+                    });
+                }
             }
 
             return stocks;
