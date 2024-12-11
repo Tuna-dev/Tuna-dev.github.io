@@ -29,7 +29,7 @@
         let dataset = [];
         let dataset2 = []; 
         const currentDatas = [1.0528, 1.1169, 1.3605, 1.3735, 1.4628, 1.5291, 1.5717, 1.6110, 1.6479, 1.7004, 1.7990];
-        const apikeyList = ['60mERhafTs9NsqsSiXhSe3xkKWS5aXhHskOwY3E3','g7hNE2dzy7fi3YaIlt2q8TmF6cv1SfH3lKZH8zx6'];
+        const apikeyList = ['g7hNE2dzy7fi3YaIlt2q8TmF6cv1SfH3lKZH8zx6','60mERhafTs9NsqsSiXhSe3xkKWS5aXhHskOwY3E3'];
         let currentKeyindex = 0;
         var myChart2;
         const stocks = [
@@ -43,67 +43,78 @@
             { name: "삼성화재우", eps: 48000, ticker: "000815", before1: 1790, before2: 6133, before3: 6022, before4: 4286, after1: 1783, after2: 7019, after3: 6124, after4: 5545, count: 0},
             
         ];
+
         async function fetchStockData(stocks) {
             const baseUrl = "https://yfapi.net/v6/finance/quote";
+            const testUrl = "https://yfapi.net/v11/finance/quoteSummary";
             const availableKeys = [...apikeyList];
             let currentIndex = 0;
+
             function getNextApiKey() {
                 if (availableKeys.length === 0) {
                     console.log("모든 API 키가 제한에 도달했습니다.");
                     throw new Error("모든 API 키가 제한에 도달했습니다.");
                 }
-                currentKeyindex = (currentKeyindex + 1) % apikeyList.length;
-                return apikeyList[currentKeyindex];
+                currentIndex = (currentIndex + 1) % apikeyList.length;
+                return apikeyList[currentIndex];
             }
-            
-            for (let stock of stocks) {
+
+            async function fetchBatch(symbols) {
                 let success = false;
                 while (!success) {
-                    console.log("시도중")
                     const apiKey = getNextApiKey();
-                    var baseOptions = {
+                    const baseOptions = {
                         method: 'GET',
                         url: baseUrl,
-                        params: {symbols: stock.ticker+'.KS' , region:'US'},
+                        params: { symbols: symbols.join(","), region: 'US' },
                         headers: {
                             'x-api-key': apiKey
                         }
                     };
-                    console.log(baseOptions)
 
-                    await axios.request(baseOptions).then(function (response) {
-                        const data = response.data;
-                        stock.price = data.quoteResponse.result[0].regularMarketPrice;
-
-                        totalSeed += stock.price*stock.count
-                        stock.id = stock.name;
-                        stock.per = round(stock.price / stock.eps, 2);
-
-                        const beforeTotal = stock.before1 + stock.before2 + stock.before3 + stock.before4;
-                        const afterTotal = stock.after1 + stock.after2 + stock.after3 + stock.after4;
-                        stock.eps = round(((afterTotal - beforeTotal) / beforeTotal) * 100, 2);
-                        
-                        success = true; // 요청 성공 시 반복 종료
-                    }).catch(function (error) {
-                        console.error(`Error fetching data for ${stock.name} with API key: ${apiKey}`);
-                        // 현재 API 키를 사용 불가능 상태로 만들기
+                    try {
+                        const response = await axios.request(baseOptions);
+                        return response.data.quoteResponse.result;
+                    } catch (error) {
+                        console.error(`Error fetching data for symbols: ${symbols} with API key: ${apiKey}`);
                         availableKeys.splice(currentIndex, 1);
                         currentIndex--; // 다음 키로 넘어가야 하므로 인덱스 조정
-                    });
+                    }
                 }
             }
-            console.log(stocks)
-            return stocks;
+
+            const results = [];
+            for (let i = 0; i < stocks.length; i += 10) {
+                const batch = stocks.slice(i, i + 10);
+                const symbols = batch.map(stock => stock.ticker + '.KS');
+                const batchData = await fetchBatch(symbols);
+                batch.forEach((stock, index) => {
+                    const data = batchData.find(item => item.symbol === symbols[index]);
+                    if (data) {
+                        stock.price = data.regularMarketPrice;
+                        stock.per = round(stock.price / stock.eps, 2);
+                        totalSeed += stock.price*stock.count
+                        stock.id = data.shortName;
+                        const beforeTotal = stock.before1 + stock.before2 + stock.before3 + stock.before4;
+                        const afterTotal = stock.after1 + stock.after2 + stock.after3 + stock.after4;
+                        stock.growth = round(((afterTotal - beforeTotal) / beforeTotal) * 100, 2);
+                    }
+                    results.push(stock);
+                });
+                
+            }
+            return results;
         }
+
 
         async function init() {
             dataset = await fetchStockData(stocks);
 
-            dataset = dataset.filter(item => item.eps >= item.per && item.per <= 25);
+            dataset = dataset.filter(item => item.growth >= item.per && item.per <= 25);
 
             for (let stock of dataset) {
-                stock.targetPrice = stock.price * Math.sqrt(Math.min(stock.eps, 25) / stock.per);
-                stock.point = stock.eps * (30 - stock.per);
+                stock.targetPrice = stock.price * Math.sqrt(Math.min(stock.growth, 25) / stock.per);
+                stock.point = stock.growth * (30 - stock.per);
             }
 
             const totalPoint = dataset.reduce((sum, stock) => sum + stock.point, 0);
@@ -139,64 +150,77 @@
 
             let ctx1 = document.getElementById("myChart1").getContext("2d");
             new Chart(ctx1, {
-                type: "bar",
-                data: {
-                    labels: dataset.map(stock => stock.id),
-                    datasets: [
-                        {
-                            label: "자금 배분 비율 (원)",
-                            data: dataset.map(stock => (stock.targetCount * stock.price)/totalSeed*100),
-                            backgroundColor: "rgba(75, 192, 192, 0.6)",
-                            borderColor: "rgba(75, 192, 192, 1)",
-                            yAxisID: 'y',
-                        },
-                        {
-                            label: "현재 보유 갯수",
-                            data: dataset.map(stock => stock.count),
-                            backgroundColor: "rgba(255, 165, 0, 0.6)", 
-                            borderColor: "rgba(255, 165, 0, 1)", 
-                            yAxisID: 'y1',
-                        },
-                        {
-                            label: "목표 보유 갯수",
-                            data: dataset.map(stock => stock.targetCount),
-                            backgroundColor: "rgba(153, 102, 255, 0.6)",
-                            borderColor: "rgba(153, 102, 255, 1)",
-                            yAxisID: 'y1',
-                        },
-                    ],
+    type: "bar",
+    data: {
+        labels: dataset.map(stock => stock.id),
+        datasets: [
+                {
+                    label: "자금 배분 비율 (원)",
+                    data: dataset.map(stock => (stock.targetCount * stock.price) / totalSeed * 100),
+                    backgroundColor: "rgba(75, 192, 192, 0.6)",
+                    borderColor: "rgba(75, 192, 192, 1)",
+                    yAxisID: 'y',
                 },
-                options: {
-                    responsive: true,
-                    scales: {
-                        y: {
-                            beginAtZero: true,
-                            title: {
-                                display: true,
-                                text: '자금 배분 비율 (원)'
+                {
+                    label: "현재 보유 갯수",
+                    data: dataset.map(stock => stock.count),
+                    backgroundColor: "rgba(255, 165, 0, 0.6)", 
+                    borderColor: "rgba(255, 165, 0, 1)", 
+                    yAxisID: 'y1',
+                },
+                {
+                    label: "목표 보유 갯수",
+                    data: dataset.map(stock => stock.targetCount),
+                    backgroundColor: "rgba(153, 102, 255, 0.6)",
+                    borderColor: "rgba(153, 102, 255, 1)",
+                    yAxisID: 'y1',
+                },
+            ],
+        },
+        options: {
+            responsive: true,
+            scales: {
+                x: {
+                    ticks: {
+                        font: {
+                            size: (ctx) => {
+                                // 글자 길이에 따라 글자 크기 계산
+                                const maxLength = Math.max(...ctx.chart.data.labels.map(label => label.length));
+                                return maxLength > 5 ? 10 : 14; // 10자 이상이면 글자 크기 줄임
                             },
-                            position: 'left', // 왼쪽 y축
                         },
-                        y1: {
-                            beginAtZero: true,
-                            title: {
-                                display: true,
-                                text: '목표 보유 갯수'
-                            },
-                            position: 'right', // 오른쪽 y축
-                            grid: {
-                                drawOnChartArea: false // 오른쪽 축의 그리드를 숨김
-                            }
-                        }
-                    },
-                    plugins: {
-                        title: {
-                            display: true,
-                            text: "회사별 자금 배분 비율 및 목표 보유 갯수",
-                        },
+                        autoSkip: false, // 레이블 자동 생략 비활성화
                     },
                 },
-            });
+                y: {
+                    beginAtZero: true,
+                    title: {
+                        display: true,
+                        text: '자금 배분 비율 (원)'
+                    },
+                    position: 'left', // 왼쪽 y축
+                },
+                y1: {
+                    beginAtZero: true,
+                    title: {
+                        display: true,
+                        text: '목표 보유 갯수'
+                    },
+                    position: 'right', // 오른쪽 y축
+                    grid: {
+                        drawOnChartArea: false // 오른쪽 축의 그리드를 숨김
+                    }
+                }
+            },
+            plugins: {
+                title: {
+                    display: true,
+                    text: "회사별 자금 배분 비율 및 목표 보유 갯수",
+                },
+            },
+        },
+    });
+
 
             // dataset2 초기화 및 데이터 생성 부분
             var targetGrowth = 1.004867;
