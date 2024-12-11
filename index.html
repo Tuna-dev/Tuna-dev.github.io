@@ -9,8 +9,9 @@
 </head>
 <body>
     <div style="width: 80%; margin: auto;">
-        <h1>회사별 자금 배분 비율</h1>
         <canvas id="myChart1" width="400" height="200"></canvas>
+        <div> 수정 전 포트폴리오 지난 1개월 수익률 : <span id="performanceRate"></span>% 수익금액: <span id="performanceValue"></span></span></div>
+        <div> 수정 후 포트폴리오 지난 1개월 수익률 : <span id="performanceRateN"></span>% 수익금액: <span id="performanceValueN"></span></span></div>
         <div id="trade" class="flex flex-wrap gap-4 justify-center p-4"></div>
         <span>잉여현금 : <span id="remains"></span></span></br></br>
         <span>총 평가금 : <span id="totalSeed"></span></span></br></br>
@@ -27,7 +28,9 @@
     </div>
     
     <script>
-        let totalSeed = 3000000;
+        let addingSeed = 3000000;
+        let totalSeedBefore = 0; // 새로운 포폴에서 제거되는종목의 판매후 가격합계
+        let totalSeed = addingSeed; 
         let dataset = [];
         let dataset2 = []; 
         const currentDatas = [1.0528, 1.1169, 1.3605, 1.3735, 1.4628, 1.5291, 1.5717, 1.6110, 1.6479, 1.7004, 1.7990];
@@ -48,7 +51,7 @@
 
         async function fetchStockData(stocks) {
             const baseUrl = "https://yfapi.net/v6/finance/quote";
-            const testUrl = "https://yfapi.net/v11/finance/quoteSummary";
+            const sparkUrl = "https://yfapi.net/v8/finance/spark";
             const availableKeys = [...apikeyList];
             let currentIndex = 0;
 
@@ -85,25 +88,51 @@
                 }
             }
 
+            async function fetchBatchSpark(symbols) {
+                let success = false;
+                while (!success) {
+                    const apiKey = getNextApiKey();
+                    const baseOptions = {
+                        method: 'GET',
+                        url: sparkUrl,
+                        params: { symbols: symbols.join(","), region: 'US' ,interval:'1d', range:'1mo'},
+                        headers: {
+                            'x-api-key': apiKey
+                        }
+                    };
+
+                    try {
+                        const response = await axios.request(baseOptions);
+                        return response.data;
+                    } catch (error) {
+                        console.error(`Error fetching data for symbols: ${symbols} with API key: ${apiKey}`);
+                        availableKeys.splice(currentIndex, 1);
+                        currentIndex--; // 다음 키로 넘어가야 하므로 인덱스 조정
+                    }
+                }
+            }
+
             const results = [];
             for (let i = 0; i < stocks.length; i += 10) {
                 const batch = stocks.slice(i, i + 10);
                 const symbols = batch.map(stock => stock.ticker + '.KS');
                 const batchData = await fetchBatch(symbols);
+                const batchDataSpark = await fetchBatchSpark(symbols);
                 batch.forEach((stock, index) => {
                     const data = batchData.find(item => item.symbol === symbols[index]);
                     if (data) {
                         stock.price = data.regularMarketPrice;
                         stock.per = round(stock.price / stock.eps, 2);
-                        totalSeed += stock.price*stock.count
+                        totalSeed += stock.price*stock.count;
+                        totalSeedBefore += stock.price*stock.count;
                         stock.id = data.shortName;
                         const beforeTotal = stock.before1 + stock.before2 + stock.before3 + stock.before4;
                         const afterTotal = stock.after1 + stock.after2 + stock.after3 + stock.after4;
                         stock.growth = round(((afterTotal - beforeTotal) / beforeTotal) * 100, 2);
+                        stock.performance = batchDataSpark[symbols[index]].chartPreviousClose;
                     }
                     results.push(stock);
                 });
-                
             }
             return results;
         }
@@ -146,7 +175,7 @@
             
             let targetPriceHtml = "";
             dataset.forEach(stock => {
-                targetPriceHtml += `<p>${stock.id}: ${stock.price} → ${round(stock.targetPrice, 0)} (${round((stock.targetPrice - stock.price) / stock.price * 100, 1)}%)</p>`;
+                targetPriceHtml += `<p>${stock.id}: ${stock.price.toLocaleString()} → ${round(stock.targetPrice, 0).toLocaleString()} (${round((stock.targetPrice - stock.price) / stock.price * 100, 1)}%)</p>`;
             });
             document.getElementById("targetPrice").innerHTML = targetPriceHtml;
 
@@ -155,15 +184,12 @@
             let html ='';
             dataset.map((stock,index)=> {
                 if((stock.targetCount - stock.count) != 0){
-                    console.log(stock);
                     tradeDatas[index] = {};
                     tradeDatas[index].id = stock.id;
                     tradeDatas[index].tradeCount = stock.targetCount - stock.count;
                 }
             });
-            console.log(tradeDatas)
             tradeDatas.sort((a, b) => a.tradeCount - b.tradeCount);
-            console.log(tradeDatas)
             tradeDatas.map((data)=>{
                 let tradeText = data.id;
                 if(data.tradeCount > 0){
@@ -178,6 +204,22 @@
                 html +='</div>';
             });
             document.getElementById("trade").innerHTML = html;
+
+            //월간 성과계산
+            let performanceRate;
+            let performanceValue=0;
+            let performanceRateN;
+            let performanceValueN=0;
+            dataset.map((stock,i) => {
+                performanceValue += (stock.price - stock.performance) * stock.count;
+                performanceValueN += (stock.price - stock.performance) * stock.targetCount;
+            });
+            performanceRate = round(performanceValue / (totalSeedBefore - performanceValue) * 100 , 2);
+            performanceRateN = round(performanceValueN / (totalSeed - performanceValueN) * 100 , 2);
+            document.getElementById("performanceRate").innerHTML = performanceRate;
+            document.getElementById("performanceValue").innerHTML = performanceValue.toLocaleString();
+            document.getElementById("performanceRateN").innerHTML = performanceRateN;
+            document.getElementById("performanceValueN").innerHTML = performanceValueN.toLocaleString();
 
             let ctx1 = document.getElementById("myChart1").getContext("2d");
             new Chart(ctx1, {
