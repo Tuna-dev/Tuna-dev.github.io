@@ -9,22 +9,40 @@
 </head>
 <body>
     <div style="width: 80%; margin: auto;">
-        <canvas id="myChart1" width="400" height="200"></canvas>
-        <div> 수정 전 포트폴리오 지난 1개월 수익률 : <span id="performanceRate"></span>% 수익금액: <span id="performanceValue"></span></span></div>
-        <div> 수정 후 포트폴리오 지난 1개월 수익률 : <span id="performanceRateN"></span>% 수익금액: <span id="performanceValueN"></span></span></div>
-        <div id="trade" class="flex flex-wrap gap-4 justify-center p-4"></div>
-        <span>잉여현금 : <span id="remains"></span></span></br></br>
-        <span>총 평가금 : <span id="totalSeed"></span></span></br></br>
-        <span>종목별 목표주가 : <span id="targetPrice"></span></span>
-        <h2>목표달성률 트래킹</h2>
-        <canvas id="myChart2" width="400" height="200"></canvas>
-        <p><span>목표달성률 : <span id="goalAchievementRate"></span>%</span></p>
-        <p><span>기준값 대비 "<span id="goalOverPerformRate"></span>%" 초과달성 상황입니다.</span></p>
-        <label for="startDate">조회 시작 날짜:</label>
-        <input type="month" id="startDate" value="2024-01">
-        <label for="endDate">조회 종료 날짜:</label>
-        <input type="month" id="endDate" value="2040-12">
-        <button onclick="updateChart()">조회</button>
+        <!-- Accordion Tabs -->
+        <div class="space-y-2">
+            <!-- Tab 1 -->
+            <div class="border rounded shadow">
+                <button class="w-full text-left px-4 py-2 font-bold bg-gray-100 hover:bg-gray-200 focus:outline-none" onclick="toggleAccordion('chart1Content')">
+                    차트 1: 회사별 자금 배분 비율 및 목표 보유 갯수
+                </button>
+                <div id="chart1Content" class="px-4 py-2">
+                    <canvas id="myChart1" width="400" height="200"></canvas>
+                    <div id="trade" class="flex flex-wrap gap-4 justify-center p-4"></div>
+                    <div> 수정 전 포트폴리오 지난 1개월 수익률 : <span id="performanceRate"></span>% 수익금액: <span id="performanceValue"></span></span></div>
+                    <div> 수정 후 포트폴리오 지난 1개월 수익률 : <span id="performanceRateN"></span>% 수익금액: <span id="performanceValueN"></span></span></div>
+                    <div>추가 투자금 : <span id="addingSeed"></span></div>
+                    <div>총 평가금 : <span id="totalSeed"></span></div></br></br>
+                    <span>종목별 목표주가 : <span id="targetPrice"></span></span>
+                </div>
+            </div>
+             <!-- Tab 2 -->
+            <div class="border rounded shadow">   
+                <button class="w-full text-left px-4 py-2 font-bold bg-gray-100 hover:bg-gray-200 focus:outline-none" onclick="toggleAccordion('chart2Content')">
+                    차트 2: 목표달성률 트래킹 및 인플레이션 감안 목표선
+                </button>
+                <div id="chart2Content" class="hidden px-4 py-2">
+                    <canvas id="myChart2" width="400" height="200"></canvas>
+                    <p><span>목표달성률 : <span id="goalAchievementRate"></span>%</span></p>
+                    <p><span>기준값 대비 "<span id="goalOverPerformRate"></span>%" 초과달성 상황입니다.</span></p>
+                    <label for="startDate">조회 시작 날짜:</label>
+                    <input type="month" id="startDate" value="2024-01">
+                    <label for="endDate">조회 종료 날짜:</label>
+                    <input type="month" id="endDate" value="2040-12">
+                    <button onclick="updateChart()">조회</button>
+                </div>
+            </div>
+        </div>
     </div>
     
     <script>
@@ -48,7 +66,16 @@
             { name: "삼성화재우", eps: 48000, ticker: "000815", before1: 1790, before2: 6133, before3: 6022, before4: 4286, after1: 1783, after2: 7019, after3: 6124, after4: 5545, count: 0},
             
         ];
+        function toggleAccordion(contentId) {
+            const content = document.getElementById(contentId);
+            const allContents = document.querySelectorAll('[id$="Content"]');
 
+            allContents.forEach(c => {
+                if (c !== content) c.classList.add('hidden');
+            });
+
+            content.classList.toggle('hidden');
+        }
         async function fetchStockData(stocks) {
             const baseUrl = "https://yfapi.net/v6/finance/quote";
             const sparkUrl = "https://yfapi.net/v8/finance/spark";
@@ -60,7 +87,8 @@
                     console.log("모든 API 키가 제한에 도달했습니다.");
                     throw new Error("모든 API 키가 제한에 도달했습니다.");
                 }
-                currentIndex = (currentIndex + 1) % apikeyList.length;
+                currentIndex = (currentIndex) % apikeyList.length;
+                console.log( '키 인덱스 :'+currentIndex)
                 return apikeyList[currentIndex];
             }
 
@@ -81,9 +109,7 @@
                         const response = await axios.request(baseOptions);
                         return response.data.quoteResponse.result;
                     } catch (error) {
-                        console.error(`Error fetching data for symbols: ${symbols} with API key: ${apiKey}`);
                         availableKeys.splice(currentIndex, 1);
-                        currentIndex--; // 다음 키로 넘어가야 하므로 인덱스 조정
                     }
                 }
             }
@@ -105,9 +131,8 @@
                         const response = await axios.request(baseOptions);
                         return response.data;
                     } catch (error) {
-                        console.error(`Error fetching data for symbols: ${symbols} with API key: ${apiKey}`);
                         availableKeys.splice(currentIndex, 1);
-                        currentIndex--; // 다음 키로 넘어가야 하므로 인덱스 조정
+                        success = true;
                     }
                 }
             }
@@ -170,7 +195,7 @@
             }
             // point 값을 기준으로 정렬
             dataset.sort((a, b) => b.point - a.point);
-            document.getElementById("remains").innerText = remains.toLocaleString();
+            document.getElementById("addingSeed").innerText = addingSeed.toLocaleString();
             document.getElementById("totalSeed").innerText = totalSeed.toLocaleString();
             
             let targetPriceHtml = "";
