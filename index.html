@@ -4,7 +4,9 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=1024, initial-scale=1.0">
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-chart-treemap"></script>
     <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels"></script>
     <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
 </head>
 <body>
@@ -46,7 +48,7 @@
     </div>
     
     <script>
-        let addingSeed = 3000000;
+        let addingSeed = 4000000;
         let totalSeedBefore = 0; // 새로운 포폴에서 제거되는종목의 판매후 가격합계
         let totalSeed = addingSeed; 
         let dataset = [];
@@ -88,7 +90,6 @@
                     throw new Error("모든 API 키가 제한에 도달했습니다.");
                 }
                 currentIndex = (currentIndex) % apikeyList.length;
-                console.log( '키 인덱스 :'+currentIndex)
                 return apikeyList[currentIndex];
             }
 
@@ -245,75 +246,71 @@
             document.getElementById("performanceValue").innerHTML = performanceValue.toLocaleString();
             document.getElementById("performanceRateN").innerHTML = performanceRateN;
             document.getElementById("performanceValueN").innerHTML = performanceValueN.toLocaleString();
-
+            // 랜덤 색상을 생성하는 유틸리티 함수
+            function getColorFromValue(value) {
+                const clampedValue = Math.max(-20, Math.min(20, value));
+                const alpha = Math.abs(clampedValue) / 20;
+                const red = clampedValue > 0 ? 255 : 0;
+                const blue = clampedValue < 0 ? 255 : 0;
+                const green = 0;
+                return `rgba(${red}, ${green}, ${blue}, ${alpha})`;
+            }
             let ctx1 = document.getElementById("myChart1").getContext("2d");
+            const chartdata = dataset.map(item => {
+                return {
+                    id : item.id,
+                    percentage: round(item.targetCount * item.price / totalSeed * 100,2),
+                    performanceRate:round((item.price - item.performance)/item.performance * 100,2)
+                };
+            });
             new Chart(ctx1, {
-            type: "bar",
-            data: {
-                labels: dataset.map(stock => stock.id),
-                datasets: [
-                        {
-                            label: "자금 배분 비율 (원)",
-                            data: dataset.map(stock => (stock.targetCount * stock.price) / totalSeed * 100),
-                            backgroundColor: "rgba(102, 153, 255, 0.75)",
-                            yAxisID: 'y',
+                type: 'treemap', // Treemap 타입 사용
+                data: {
+                    datasets: [{
+                        label: '포트폴리오 분배',
+                        tree: chartdata,
+                        key: 'percentage', // 데이터에서 값 키 설정
+                        backgroundColor:(ctx1) => {
+                            if(ctx1.raw){
+                                const value = ctx1.raw._data.performanceRate; // 데이터의 값
+                                return getColorFromValue(value); // 색상 반환
+                            }
+                            
                         },
-                        {
-                            label: "현재 보유 갯수",
-                            data: dataset.map(stock => stock.count),
-                            backgroundColor: "rgba(0, 204, 153, 0.75)", 
-                            yAxisID: 'y1',
-                        },
-                        {
-                            label: "목표 보유 갯수",
-                            data: dataset.map(stock => stock.targetCount),
-                            backgroundColor: "rgba(255, 102, 102, 0.75)",
-                            yAxisID: 'y1',
-                        },
-                    ],
+                        borderColor: 'rgba(0, 0, 0, 0.1)',
+                        borderWidth: 1
+                    }]
                 },
                 options: {
-                    responsive: true,
-                    scales: {
-                        x: {
-                            ticks: {
-                                font: {
-                                    size: (ctx) => {
-                                        // 글자 길이에 따라 글자 크기 계산
-                                        const maxLength = Math.max(...ctx.chart.data.labels.map(label => label.length));
-                                        return maxLength > 5 ? 10 : 14; // 10자 이상이면 글자 크기 줄임
-                                    },
-                                },
-                                autoSkip: false, // 레이블 자동 생략 비활성화
-                            },
-                        },
-                        y: {
-                            beginAtZero: true,
-                            title: {
-                                display: true,
-                                text: '자금 배분 비율 (원)'
-                            },
-                            position: 'left', // 왼쪽 y축
-                        },
-                        y1: {
-                            beginAtZero: true,
-                            title: {
-                                display: true,
-                                text: '목표 보유 갯수'
-                            },
-                            position: 'right', // 오른쪽 y축
-                            grid: {
-                                drawOnChartArea: false // 오른쪽 축의 그리드를 숨김
-                            }
-                        }
-                    },
                     plugins: {
-                        title: {
-                            display: true,
-                            text: "회사별 자금 배분 비율 및 목표 보유 갯수",
+                        legend: {
+                            display: false // 범례 숨김
                         },
-                    },
+                        tooltip: {
+                            callbacks: {
+                                label: (tooltipItem) => {
+                                    const rawData = tooltipItem.raw._data;
+                                    return `지난 1개월: ${rawData.performanceRate}%`;
+                                }
+                            }
+                        },
+                        datalabels: {
+                            color: 'white', // 레이블 텍스트 색상
+                            font: {
+                                weight: 'bold',
+                                size: 14
+                            },
+                            formatter: (formatterItem) => {
+                                console.log(formatterItem);
+                                const dataItem = formatterItem._data; // 
+                                return `${dataItem.id}\n${dataItem.percentage}%`;
+                            },
+                            align: 'center', // 레이블 텍스트 정렬
+                            anchor: 'center' // 레이블 위치
+                        }
+                    }
                 },
+                plugins: [ChartDataLabels] // datalabels 플러그인 활성화
             });
 
 
