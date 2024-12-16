@@ -7,6 +7,8 @@
     <script src="https://cdn.jsdelivr.net/npm/chartjs-chart-treemap"></script>
     <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-database.js"></script>
     <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
 </head>
 <body>
@@ -48,26 +50,132 @@
     </div>
     
     <script>
+
+
+        const firebaseConfig = {
+            apiKey: "AIzaSyD2HEzJ5KRWYKH_rje4h5SSIzYb3ioR53Y",
+            authDomain: "mydatabase-292f5.firebaseapp.com",
+            databaseURL: "https://mydatabase-292f5-default-rtdb.firebaseio.com",
+            projectId: "mydatabase-292f5",
+            storageBucket: "mydatabase-292f5.firebasestorage.app",
+            messagingSenderId: "649767823511",
+            appId: "1:649767823511:web:27bc8a09a81dafb04021d2"
+        };
+
+        // Initialize Firebase
+        firebase.initializeApp(firebaseConfig);
+        const db = firebase.database();
+        const dbRoot = firebase.database().ref('financeApp');
+        function insertData(path, data) {
+            let pathRef = dbRoot.child(path);
+            pathRef.set(data)
+            .then(() => {
+                console.log("Data inserted successfully.");
+            })
+            .catch((error) => {
+                console.error("Error inserting data: ", error);
+            });
+        }
+        function updateData(path, data) {
+            let pathRef = dbRoot.child(path);
+            pathRef.update(data)
+            .then(() => {
+                console.log("Data updated successfully.");
+            })
+            .catch((error) => {
+                console.error("Error removing data: ", error);
+            });
+        }
+        function removeData(path) {
+            let pathRef = dbRoot.child(path);
+            pathRef.remove()
+            .then(() => {
+                console.log("Data removed successfully.");
+            })
+            .catch((error) => {
+                console.error("Error removing data: ", error);
+            });
+        }
+        function retrieveData(path) {
+            return new Promise((resolve, reject) => {
+                let pathRef = dbRoot.child(path); // Firebase 경로 참조
+                pathRef.once('value', (snapshot) => {
+                    const data = snapshot.val();
+                    if (data) {
+                        resolve(data); // 데이터를 Promise로 반환
+                    } else {
+                        console.log(`No data found at ${path}.`);
+                        resolve(null); // 데이터가 없을 경우 null 반환
+                    }
+                }, (error) => {
+                    console.error(`Error retrieving data from ${path}:`, error);
+                    reject(error); // 에러를 Promise로 반환
+                });
+            });
+        }
+
+        async function preQuery() {
+            try {
+                // 여러 쿼리를 실행하고 결과를 기다림
+                moneyCurveDatas = await retrieveData('moneyCurveDatas');
+                apikeyList = await retrieveData('apikeyList');
+                stocks = await retrieveData('targetPort');
+                const userStocks = await retrieveData('userDatas');
+                //유저정보 체크
+                let userStock = [];
+                while(userStock.length == 0){
+                    let userName = prompt('이름을 입력하세요', 'cho');
+                    userStock = userStocks.filter((data)=> data.name == userName)
+                    console.log(userStock)
+                    if(userStock.length == 0){
+                        alert('해당하는 이름이 등록되어있지않습니다.')
+                    }
+                }
+                userStock = userStock[0].currentPort;
+                // 1. array2를 ticker를 키로 하는 객체로 변환
+                const map = stocks.reduce((acc, item) => {
+                    acc[item.ticker] = item;
+                    return acc;
+                }, {});
+
+                // 2. array1의 각 객체에 대해 동일한 ticker를 가진 array2의 정보를 병합
+                const mergedArray = userStock.map(item => {
+                    if (map[item.ticker]) {
+                        return { ...item, ...map[item.ticker] };
+                    }
+                    return item;
+                });
+                stocks = mergedArray;
+                // 모든 쿼리가 완료된 후 init 실행
+                init();
+            } catch (error) {
+                console.error("Error during queries:", error);
+            }
+        }
+
+
         let addingSeed = 4000000;
         let totalSeedBefore = 0; // 새로운 포폴에서 제거되는종목의 판매후 가격합계
         let totalSeed = addingSeed; 
         let dataset = [];
         let dataset2 = []; 
-        const currentDatas = [1.0528, 1.1169, 1.3605, 1.3735, 1.4628, 1.5291, 1.5717, 1.6110, 1.6479, 1.7004, 1.7990];
-        const apikeyList = ['g7hNE2dzy7fi3YaIlt2q8TmF6cv1SfH3lKZH8zx6','60mERhafTs9NsqsSiXhSe3xkKWS5aXhHskOwY3E3'];
+        let moneyCurveDatas;
+        let apikeyList
         let currentKeyindex = 0;
         var myChart2;
-        const stocks = [
-            { name: "신한", eps: 8600, ticker: "055550", before1: 3538, before2: 14143, before3: 12687, before4: 12188, after1: 5760, after2: 13478, after3: 14509, after4: 12669, count: 34},
-            { name: "네이버", eps: 10900, ticker: "035420", before1: 1317, before2: 436, before3: 2867, before4: 3562, after1: 2984, after2: 5558, after3: 3320, after4: 5301, count: 62},
-            { name: "메리츠", eps: 12300, ticker: "138040", before1: 2637, before2: 6036, before3: 5766, before4: 5801, after1: 3649, after2: 5912, after3: 7361, after4: 6560, count: 29},
-            { name: "크래", eps: 17500, ticker: "259960", before1: -1654, before2: 2672, before3: 1285, before4: 2115, after1: -132, after2: 3486, after3: 3414, after4: 1214, count: 32},
-            { name: "케이티", eps: 8200, ticker: "033780", before1: -600, before2: 2742, before3: 2019, before4: 3332, after1: 1129, after2: 2856, after3: 3127, after4: 2399, count: 30},
-            { name: "HMM", eps: 4240, ticker: "011200", before1: 14150, before2: 2853, before3: 3128, before4: 954, after1: 2629, after2: 4850, after3: 6607, after4: 17380, count: 585},
-            { name: "HD현일", eps: 14000, ticker: "267260", before1: 460, before2: 288, before3: 374, before4: 542, after1: 1389, after2: 934, after3: 1612, after4: 1166, count: 0},
-            { name: "삼성화재우", eps: 48000, ticker: "000815", before1: 1790, before2: 6133, before3: 6022, before4: 4286, after1: 1783, after2: 7019, after3: 6124, after4: 5545, count: 0},
+        let stocks;
+        // stocks = [
+        //     { name: "신한", eps: 8600, ticker: "055550", before1: 3538, before2: 14143, before3: 12687, before4: 12188, after1: 5760, after2: 13478, after3: 14509, after4: 12669, count: 34},
+        //     { name: "네이버", eps: 10900, ticker: "035420", before1: 1317, before2: 436, before3: 2867, before4: 3562, after1: 2984, after2: 5558, after3: 3320, after4: 5301, count: 62},
+        //     { name: "메리츠", eps: 12300, ticker: "138040", before1: 2637, before2: 6036, before3: 5766, before4: 5801, after1: 3649, after2: 5912, after3: 7361, after4: 6560, count: 29},
+        //     { name: "크래", eps: 17500, ticker: "259960", before1: -1654, before2: 2672, before3: 1285, before4: 2115, after1: -132, after2: 3486, after3: 3414, after4: 1214, count: 32},
+        //     { name: "케이티", eps: 8200, ticker: "033780", before1: -600, before2: 2742, before3: 2019, before4: 3332, after1: 1129, after2: 2856, after3: 3127, after4: 2399, count: 30},
+        //     { name: "HMM", eps: 4240, ticker: "011200", before1: 14150, before2: 2853, before3: 3128, before4: 954, after1: 2629, after2: 4850, after3: 6607, after4: 17380, count: 585},
+        //     { name: "HD현일", eps: 14000, ticker: "267260", before1: 460, before2: 288, before3: 374, before4: 542, after1: 1389, after2: 934, after3: 1612, after4: 1166, count: 0},
+        //     { name: "삼성화재우", eps: 48000, ticker: "000815", before1: 1790, before2: 6133, before3: 6022, before4: 4286, after1: 1783, after2: 7019, after3: 6124, after4: 5545, count: 0},
             
-        ];
+        // ];
+        // insertData('targetPort', stocks);
         function toggleAccordion(contentId) {
             const content = document.getElementById(contentId);
             const allContents = document.querySelectorAll('[id$="Content"]');
@@ -301,7 +409,6 @@
                                 size: 14
                             },
                             formatter: (formatterItem) => {
-                                console.log(formatterItem);
                                 const dataItem = formatterItem._data; // 
                                 return `${dataItem.id}\n${dataItem.percentage}%`;
                             },
@@ -355,12 +462,12 @@
                 lastMoney = dataset2[i].targetMoney;
             });
 
-            for (let i = 0; i < currentDatas.length; i++) {
-                dataset2[i].currentMoney = currentDatas[i];
+            for (let i = 0; i < moneyCurveDatas.length; i++) {
+                dataset2[i].currentMoney = moneyCurveDatas[i];
             }
             //목표달성률 (현재)
-            const lastData = dataset2[currentDatas.length-1];
-            const lastBeforeData = dataset2[currentDatas.length-2];
+            const lastData = dataset2[moneyCurveDatas.length-1];
+            const lastBeforeData = dataset2[moneyCurveDatas.length-2];
             const goalAchievementRate = lastData.currentMoney / lastData.inflationAdjustedTarget * 100;
             const goalAchievementBeforeRate = lastBeforeData.currentMoney / lastBeforeData.inflationAdjustedTarget * 100;
             document.getElementById("goalAchievementRate").innerText = Math.round(goalAchievementBeforeRate * 10) / 10 + "% =>"+Math.round(goalAchievementRate * 10) / 10 + "%";
@@ -459,8 +566,7 @@
 
             myChart2.update(); // 차트 업데이트
         }
-
-        init();
+        preQuery();
     </script>
 </body>
 </html>
