@@ -138,6 +138,16 @@
                     return acc;
                 }, {});
 
+                while (true) {
+                    userInput = prompt('추가할 시드가 있나요? (krw)', 0);
+                    if (!isNaN(userInput) && userInput.trim() !== "") {  // 숫자인지 확인
+                        addingSeed = Number(userInput);
+                        break;
+                    } else {
+                        alert("잘못된 입력입니다. 숫자만 입력해주세요.");
+                    }
+                }
+                totalSeed += addingSeed;
                 // 2. array1의 각 객체에 대해 동일한 ticker를 가진 array2의 정보를 병합
                 const mergedArray = userStock.map(item => {
                     if (map[item.ticker]) {
@@ -154,7 +164,7 @@
         }
 
 
-        let addingSeed = 4000000;
+        let addingSeed = 0;
         let totalSeedBefore = 0; // 새로운 포폴에서 제거되는종목의 판매후 가격합계
         let totalSeed = addingSeed; 
         let dataset = [];
