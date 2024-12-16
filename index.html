@@ -10,6 +10,30 @@
     <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-database.js"></script>
     <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+    <style>
+        .tab-container {
+            display: flex;
+            border-bottom: 2px solid #ccc;
+        }
+        .tab {
+            padding: 10px 20px;
+            cursor: pointer;
+            border: 1px solid #ccc;
+            border-bottom: none;
+            background-color: #f9f9f9;
+        }
+        .tab.active {
+            background-color: #fff;
+            font-weight: bold;
+            border-top: 2px solid #007BFF;
+        }
+        .chart-container {
+            display: none;
+        }
+        .chart-container.active {
+            display: block;
+        }
+    </style>
 </head>
 <body>
     <div style="width: 80%; margin: auto;">
@@ -21,7 +45,17 @@
                     차트 1: 회사별 자금 배분 비율 및 목표 보유 갯수
                 </button>
                 <div id="chart1Content" class="px-4 py-2">
-                    <canvas id="myChart1" width="400" height="200"></canvas>
+                    <div class="tab-container">
+                        <div class="tab active" onclick="showTab('chart1Now')">현재차트</div>
+                        <div class="tab" onclick="showTab('chart1After')">수정후 차트</div>
+                    </div>
+                
+                    <div id="chart1Now" class="chart-container active">
+                        <canvas id="myChart1_now" width="400" height="200"></canvas>
+                    </div>
+                    <div id="chart1After" class="chart-container">
+                        <canvas id="myChart1_after" width="400" height="200"></canvas>
+                    </div>
                     <div id="trade" class="flex flex-wrap gap-4 justify-center p-4"></div>
                     <div> 수정 전 포트폴리오 지난 1개월 수익률 : <span id="performanceRate"></span>% 수익금액: <span id="performanceValue"></span></span></div>
                     <div> 수정 후 포트폴리오 지난 1개월 수익률 : <span id="performanceRateN"></span>% 수익금액: <span id="performanceValueN"></span></span></div>
@@ -195,6 +229,14 @@
             });
 
             content.classList.toggle('hidden');
+        }
+        function showTab(chartId){
+            document.querySelectorAll('.tab').forEach(tab => tab.classList.remove('active'));
+            document.querySelectorAll('.chart-container').forEach(container => container.classList.remove('active'));
+
+            // Add active class to the selected tab and container
+            document.querySelector(`[onclick="showTab('${chartId}')"]`).classList.add('active');
+            document.getElementById(chartId).classList.add('active');
         }
         async function fetchStockData(stocks) {
             const baseUrl = "https://yfapi.net/v6/finance/quote";
@@ -373,20 +415,20 @@
                 const green = 0;
                 return `rgba(${red}, ${green}, ${blue}, ${alpha})`;
             }
-            let ctx1 = document.getElementById("myChart1").getContext("2d");
-            const chartdata = dataset.map(item => {
+            let ctx1_now = document.getElementById("myChart1_now").getContext("2d");
+            const chartdata_now = dataset.map(item => {
                 return {
                     id : item.id,
-                    percentage: round(item.targetCount * item.price / totalSeed * 100,2),
+                    percentage: round(item.count * item.price / totalSeed * 100,2),
                     performanceRate:round((item.price - item.performance)/item.performance * 100,2)
                 };
             });
-            new Chart(ctx1, {
+            new Chart(ctx1_now, {
                 type: 'treemap', // Treemap 타입 사용
                 data: {
                     datasets: [{
                         label: '포트폴리오 분배',
-                        tree: chartdata,
+                        tree: chartdata_now,
                         key: 'percentage', // 데이터에서 값 키 설정
                         backgroundColor:(ctx1) => {
                             if(ctx1.raw){
@@ -429,6 +471,64 @@
                 },
                 plugins: [ChartDataLabels] // datalabels 플러그인 활성화
             });
+
+            let ctx1_after = document.getElementById("myChart1_after").getContext("2d");
+            const chartdata_after = dataset.map(item => {
+                return {
+                    id : item.id,
+                    percentage: round(item.targetCount * item.price / totalSeed * 100,2),
+                    performanceRate:round((item.price - item.performance)/item.performance * 100,2)
+                };
+            });
+            new Chart(ctx1_after, {
+                type: 'treemap', // Treemap 타입 사용
+                data: {
+                    datasets: [{
+                        label: '포트폴리오 분배',
+                        tree: chartdata_after,
+                        key: 'percentage', // 데이터에서 값 키 설정
+                        backgroundColor:(ctx1) => {
+                            if(ctx1.raw){
+                                const value = ctx1.raw._data.performanceRate; // 데이터의 값
+                                return getColorFromValue(value); // 색상 반환
+                            }
+                            
+                        },
+                        borderColor: 'rgba(0, 0, 0, 0.1)',
+                        borderWidth: 1
+                    }]
+                },
+                options: {
+                    plugins: {
+                        legend: {
+                            display: false // 범례 숨김
+                        },
+                        tooltip: {
+                            callbacks: {
+                                label: (tooltipItem) => {
+                                    const rawData = tooltipItem.raw._data;
+                                    return `지난 1개월: ${rawData.performanceRate}%`;
+                                }
+                            }
+                        },
+                        datalabels: {
+                            color: 'black', // 레이블 텍스트 색상
+                            font: {
+                                weight: 'bold',
+                                size: 14
+                            },
+                            formatter: (formatterItem) => {
+                                const dataItem = formatterItem._data; // 
+                                return `${dataItem.id}\n${dataItem.percentage}%`;
+                            },
+                            align: 'center', // 레이블 텍스트 정렬
+                            anchor: 'center' // 레이블 위치
+                        }
+                    }
+                },
+                plugins: [ChartDataLabels] // datalabels 플러그인 활성화
+            });
+
 
 
             // dataset2 초기화 및 데이터 생성 부분
