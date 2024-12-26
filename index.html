@@ -160,18 +160,20 @@
                 while(userStock.length == 0){
                     let userName = prompt('이름을 입력하세요', 'cho');
                     userStock = userStocks.filter((data)=> data.name == userName)
-                    console.log(userStock)
                     if(userStock.length == 0){
                         alert('해당하는 이름이 등록되어있지않습니다.')
                     }
                 }
                 userStock = userStock[0].currentPort;
                 // 1. array2를 ticker를 키로 하는 객체로 변환
-                const map = stocks.reduce((acc, item) => {
+                const map = userStock.reduce((acc, item) => {
                     acc[item.ticker] = item;
                     return acc;
                 }, {});
-
+                // const map = stocks.reduce((acc, item) => {
+                //     acc[item.ticker] = item;
+                //     return acc;
+                // }, {});
                 while (true) {
                     userInput = prompt('추가할 시드가 있나요? (krw)', 0);
                     if (!isNaN(userInput) && userInput.trim() !== "") {  // 숫자인지 확인
@@ -183,13 +185,14 @@
                 }
                 totalSeed += addingSeed;
                 // 2. array1의 각 객체에 대해 동일한 ticker를 가진 array2의 정보를 병합
-                const mergedArray = userStock.map(item => {
+                const mergedArray = stocks.map(item => {
                     if (map[item.ticker]) {
                         return { ...item, ...map[item.ticker] };
                     }
-                    return item;
+                    return { ...item, count:0};
                 });
                 stocks = mergedArray;
+                console.log(mergedArray);
                 // 모든 쿼리가 완료된 후 init 실행
                 init();
             } catch (error) {
@@ -208,18 +211,6 @@
         let currentKeyindex = 0;
         var myChart2;
         let stocks;
-        // stocks = [
-        //     { name: "신한", eps: 8600, ticker: "055550", before1: 3538, before2: 14143, before3: 12687, before4: 12188, after1: 5760, after2: 13478, after3: 14509, after4: 12669, count: 34},
-        //     { name: "네이버", eps: 10900, ticker: "035420", before1: 1317, before2: 436, before3: 2867, before4: 3562, after1: 2984, after2: 5558, after3: 3320, after4: 5301, count: 62},
-        //     { name: "메리츠", eps: 12300, ticker: "138040", before1: 2637, before2: 6036, before3: 5766, before4: 5801, after1: 3649, after2: 5912, after3: 7361, after4: 6560, count: 29},
-        //     { name: "크래", eps: 17500, ticker: "259960", before1: -1654, before2: 2672, before3: 1285, before4: 2115, after1: -132, after2: 3486, after3: 3414, after4: 1214, count: 32},
-        //     { name: "케이티", eps: 8200, ticker: "033780", before1: -600, before2: 2742, before3: 2019, before4: 3332, after1: 1129, after2: 2856, after3: 3127, after4: 2399, count: 30},
-        //     { name: "HMM", eps: 4240, ticker: "011200", before1: 14150, before2: 2853, before3: 3128, before4: 954, after1: 2629, after2: 4850, after3: 6607, after4: 17380, count: 585},
-        //     { name: "HD현일", eps: 14000, ticker: "267260", before1: 460, before2: 288, before3: 374, before4: 542, after1: 1389, after2: 934, after3: 1612, after4: 1166, count: 0},
-        //     { name: "삼성화재우", eps: 48000, ticker: "000815", before1: 1790, before2: 6133, before3: 6022, before4: 4286, after1: 1783, after2: 7019, after3: 6124, after4: 5545, count: 0},
-            
-        // ];
-        // insertData('targetPort', stocks);
         function toggleAccordion(contentId) {
             const content = document.getElementById(contentId);
             const allContents = document.querySelectorAll('[id$="Content"]');
@@ -333,7 +324,6 @@
                 stock.targetPrice = stock.price * Math.sqrt(Math.min(stock.growth, 25) / stock.per);
                 stock.point = stock.growth * (30 - stock.per);
             }
-
             const totalPoint = dataset.reduce((sum, stock) => sum + stock.point, 0);
 
             dataset.forEach(stock => {

@@ -23,17 +23,17 @@
         var ASOXRATIO = 0.1;
         var etfRatio = [stockRatio ,hedgeRatio, indiaRatio, moatRatio, ASOXRATIO];
 
-        var dolorStock = [4076304,48562711,10638637,10650161,0];
-        var krwStock = [(20339085+2220400),1928120,0,0,7469280];
+        var dolorStock = [4161351,47936541,10528250,10506793,0];
+        var krwStock = [(20274150+2264080),1856140,0,0,7950150];
 
-        var exchangeRate = 1427;
-        var exchangeRate365 = 1342;
+        var exchangeRate = 1466;
+        var exchangeRate365 = 1347;
 
         var curStock = dolorStock.map((num, index) => num + krwStock[index]);
         var moveStock = [0,0,0,0,0];
         var afterStock = [0,0,0,0,0];
-        // 현재 현금 입력 (환전 후 달러예수금)
-        var dolorAcc = 0;
+        // 현재 현금 입력 (환전 후 달러예수금이였는데 한국돈으로..)
+        var dolorAcc = 3000000;
 
         // 적정 리밸런싱금액보다 10프로 더 많은 경우 해당 자산을 리밸런싱자산으로 재편성함
         var shouldRebalance = function(totalValue, curruntValue, curruntRatio){
