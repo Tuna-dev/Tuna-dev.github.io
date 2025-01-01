@@ -151,7 +151,7 @@
         async function preQuery() {
             try {
                 // 여러 쿼리를 실행하고 결과를 기다림
-                moneyCurveDatas = await retrieveData('moneyCurveDatas');
+                moneyCurveDatas = Object.values(await retrieveData('moneyCurveDatas'));
                 apikeyList = await retrieveData('apikeyList');
                 stocks = await retrieveData('targetPort');
                 const userStocks = await retrieveData('userDatas');
@@ -192,7 +192,6 @@
                     return { ...item, count:0};
                 });
                 stocks = mergedArray;
-                console.log(mergedArray);
                 // 모든 쿼리가 완료된 후 init 실행
                 init();
             } catch (error) {
