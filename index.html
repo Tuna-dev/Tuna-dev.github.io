@@ -385,9 +385,13 @@
             let performanceValue=0;
             let performanceRateN;
             let performanceValueN=0;
+            
             dataset.map((stock,i) => {
-                performanceValue += (stock.price - stock.performance) * stock.count;
-                performanceValueN += (stock.price - stock.performance) * stock.targetCount;
+                let lastPrice = (stock.lastPrice == null)?stock.performance:stock.lastPrice;
+                // performanceValue += (stock.price - stock.performance) * stock.count;
+                // performanceValueN += (stock.price - stock.performance) * stock.targetCount;
+                performanceValue += (stock.price - lastPrice) * stock.count;
+                performanceValueN += (stock.price - lastPrice) * stock.targetCount;
             });
             performanceRate = round(performanceValue / (totalSeedBefore - performanceValue) * 100 , 2);
             performanceRateN = round(performanceValueN / (totalSeed - performanceValueN) * 100 , 2);
