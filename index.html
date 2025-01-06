@@ -344,7 +344,7 @@
                 if (!bought) break;
             }
             // point 값을 기준으로 정렬
-            dataset.sort((a, b) => b.point - a.point);
+            dataset = dataset.slice().sort((a, b) => b.point - a.point).filter((_, index) => index < 10); // 상위 10개만 남김;
             document.getElementById("addingSeed").innerText = addingSeed.toLocaleString();
             document.getElementById("totalSeed").innerText = totalSeed.toLocaleString();
             
