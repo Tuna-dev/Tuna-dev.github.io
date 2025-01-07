@@ -158,13 +158,13 @@
             // 환헷지 전략 계산
             let exchangeHtml = "";
             if (exchangeRate > exchangeRate365 * 1.1) {
-                exchangeHtml = "전량 언헷지 전환";
-            } else if (exchangeRate > exchangeRate365 * 1.025) {
-                exchangeHtml = "언헷지 매입";
-            } else if (exchangeRate > exchangeRate365 * 0.95) {
-                exchangeHtml = "헷지(H) 매입";
-            } else {
                 exchangeHtml = "전량 헷지(H) 전환";
+            } else if (exchangeRate > exchangeRate365 * 1.025) {
+                exchangeHtml = "헷지(H) 매입";
+            } else if (exchangeRate > exchangeRate365 * 0.95) {
+                exchangeHtml = "언헷지 매입";
+            } else {
+                exchangeHtml = "전량 언헷지 전환";
             }
             document.getElementById("exchange").innerHTML = exchangeHtml;
 
