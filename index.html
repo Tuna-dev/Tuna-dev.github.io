@@ -73,6 +73,7 @@
                     <canvas id="myChart2" width="400" height="200"></canvas>
                     <p><span>목표달성률 : <span id="goalAchievementRate"></span>%</span></p>
                     <p><span>기준값 대비 "<span id="goalOverPerformRate"></span>%" 초과달성 상황입니다.</span></p>
+                    <p><span>목표달성 시점 : <span id="goalAchievementDate"></span></span></p>
                     <label for="startDate">조회 시작 날짜:</label>
                     <input type="month" id="startDate" value="2024-01">
                     <label for="endDate">조회 종료 날짜:</label>
@@ -564,9 +565,18 @@
                 });
                 lastMoney = dataset2[i].targetMoney;
             });
-
+            let subLineIndex;
             for (let i = 0; i < moneyCurveDatas.length; i++) {
                 dataset2[i].currentMoney = moneyCurveDatas[i];
+                subLineIndex=i;
+            }
+            let goalAchievementDate = null;
+            dataset2[subLineIndex].subLine = dataset2[subLineIndex].currentMoney;
+            for (let i = subLineIndex+1; i < dataset2.length; i++) {
+                dataset2[i].subLine = dataset2[i-1].subLine* targetGrowth + targetSave;
+                if(dataset2[i].subLine >= dataset2[i].inflationAdjustedTarget && goalAchievementDate == null){
+                    goalAchievementDate = dataset2[i].date;
+                }
             }
             //목표달성률 (현재)
             const lastData = dataset2[moneyCurveDatas.length-1];
@@ -577,6 +587,9 @@
             //기준대비 달성률(현재)
             const goalOverPerformRate = (lastData.currentMoney - lastData.targetMoney)/ lastData.targetMoney * 100;
             document.getElementById("goalOverPerformRate").innerText = Math.round(goalOverPerformRate * 10) / 10;
+            //목표달성 시점
+            document.getElementById("goalAchievementDate").innerText = goalAchievementDate;
+
             // Chart.js를 사용하여 두 번째 그래프 그리기
             let ctx2 = document.getElementById('myChart2').getContext('2d');
             myChart2 = new Chart(ctx2, {
@@ -597,6 +610,14 @@
                             data: dataset2.map(data => data.currentMoney),
                             borderColor: 'rgba(255, 99, 132, 1)',
                             backgroundColor: 'rgba(255, 99, 132, 0.2)',
+                            fill: true,
+                            tension: 0.1
+                        },
+                        {
+                            label: '보조선',
+                            data: dataset2.map(data => data.subLine),
+                            borderColor: 'rgba(255, 255, 0, 1)',
+                            backgroundColor: 'rgba(255, 255, 0, 0.2)',
                             fill: true,
                             tension: 0.1
                         },
