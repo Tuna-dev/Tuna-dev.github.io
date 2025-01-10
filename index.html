@@ -64,6 +64,18 @@
                     <span>종목별 목표주가 : <span id="targetPrice"></span></span>
                 </div>
             </div>
+            <!-- Tab profit -->
+            <div class="border rounded shadow">
+                <button class="w-full text-left px-4 py-2 font-bold bg-gray-100 hover:bg-gray-200 focus:outline-none" onclick="toggleAccordion('profitContent')">
+                    수익탭
+                </button>
+                <div id="profitContent" class="hidden px-4 py-2">
+                    <canvas id="profit" width="400" height="200"></canvas>
+                    <div>평가 수익 : <span id="valuationAmount"></span></div>
+                    <div>실현 손익 : <span id="realizedProfitLoss"></span></div>
+                    <div>배당 수입 : <span id="dividendIncome"></span></div>
+                </div>
+            </div>
              <!-- Tab 2 -->
             <div class="border rounded shadow">   
                 <button class="w-full text-left px-4 py-2 font-bold bg-gray-100 hover:bg-gray-200 focus:outline-none" onclick="toggleAccordion('chart2Content')">
@@ -157,24 +169,26 @@
                 stocks = await retrieveData('targetPort');
                 const userStocks = await retrieveData('userDatas');
                 //유저정보 체크
-                let userStock = [];
-                while(userStock.length == 0){
+                let userStock = null;
+                while(userStock== null){
                     let userName = prompt('이름을 입력하세요', 'cho');
-                    userStock = userStocks.filter((data)=> data.name == userName)
-                    if(userStock.length == 0){
+                    userStocks.forEach((data, index) => {
+                        if (data.name === userName) {
+                            userNumber=index;
+                            userStock=data;
+                        }
+                    });
+                    if(userStock==null){
                         alert('해당하는 이름이 등록되어있지않습니다.')
                     }
                 }
-                userStock = userStock[0].currentPort;
+                const profitDataObj = userStock.profit;
+                userStock = userStock.currentPort;
                 // 1. array2를 ticker를 키로 하는 객체로 변환
                 const map = userStock.reduce((acc, item) => {
                     acc[item.ticker] = item;
                     return acc;
                 }, {});
-                // const map = stocks.reduce((acc, item) => {
-                //     acc[item.ticker] = item;
-                //     return acc;
-                // }, {});
                 while (true) {
                     userInput = prompt('추가할 시드가 있나요? (krw)', 0);
                     if (!isNaN(userInput) && userInput.trim() !== "") {  // 숫자인지 확인
@@ -194,6 +208,11 @@
                 });
                 stocks = mergedArray;
                 // 모든 쿼리가 완료된 후 init 실행
+
+                //수익 데이터 저장
+                profitDatas = Object.keys(profitDataObj)
+                                        .sort()  // 날짜순으로 정렬
+                                        .map(date => ({ date, ...profitDataObj[date] }));
                 init();
             } catch (error) {
                 console.error("Error during queries:", error);
@@ -211,6 +230,8 @@
         let currentKeyindex = 0;
         var myChart2;
         let stocks;
+        let userNumber;
+        let profitDatas = [];
         function toggleAccordion(contentId) {
             const content = document.getElementById(contentId);
             const allContents = document.querySelectorAll('[id$="Content"]');
@@ -523,7 +544,100 @@
                 plugins: [ChartDataLabels] // datalabels 플러그인 활성화
             });
 
+            // 수익 정보 노출 관련
+            let today = new Date();
+            let todayFormatted = today.toISOString().split('T')[0].replaceAll("-","");
+            let valuationAmount = 0;
+            dataset.map((stock,i) => {
+                if(stock.averageCost){
+                    valuationAmount += (stock.price - stock.averageCost)*stock.count;
+                }
+            });
 
+
+            let lastProfitData = profitDatas[profitDatas.length-1];
+            let nowData = {
+                "valuationAmount":valuationAmount,
+                "realizedProfitLoss":lastProfitData.realizedProfitLoss,
+                "dividendIncome":lastProfitData.dividendIncome
+            };
+            document.getElementById("valuationAmount").innerText = valuationAmount.toLocaleString();
+            document.getElementById("realizedProfitLoss").innerText = lastProfitData.realizedProfitLoss.toLocaleString();
+            document.getElementById("dividendIncome").innerText = lastProfitData.dividendIncome.toLocaleString();
+            //저장
+            insertData('userDatas/'+userNumber+'/profit/'+todayFormatted, nowData);
+
+            //오늘 데이터 추가
+            nowData.date = todayFormatted;
+            if(lastProfitData.date == todayFormatted){
+                profitDatas.pop();
+            }
+            profitDatas.push(nowData);
+            // 차트 그리기 profit
+            let ctxProfit = document.getElementById('profit').getContext('2d');
+            myChart2 = new Chart(ctxProfit, {
+                type: 'line',
+                data: {
+                    labels: profitDatas.map(data => {
+                        let dateStr = data.date.toString();  // yyyymmdd 형식의 문자열
+                        let month = Number(dateStr.substring(4, 6));  // 월 부분 추출
+                        let day = Number(dateStr.substring(6, 8));    // 일 부분 추출
+                        return `${month}월 ${day}일`;  // mm월dd일 형식으로 변환
+                    }),
+                    datasets: [
+                        {
+                            label: '평가수익',
+                            data: profitDatas.map(data => data.valuationAmount),
+                            borderColor: 'rgba(75, 192, 192, 1)',
+                            backgroundColor: 'rgba(75, 192, 192, 0.2)',
+                            fill: true,
+                            tension: 0.1
+                        },
+                        {
+                            label: '실현손익',
+                            data: profitDatas.map(data => data.realizedProfitLoss),
+                            borderColor: 'rgba(255, 99, 132, 1)',
+                            backgroundColor: 'rgba(255, 99, 132, 0.2)',
+                            fill: true,
+                            tension: 0.1
+                        },
+                        {
+                            label: '배당수익',
+                            data: profitDatas.map(data => data.dividendIncome),
+                            borderColor: 'rgba(54, 162, 235, 1)',
+                            backgroundColor: 'rgba(54, 162, 235, 0.2)',
+                            fill: true,
+                            tension: 0.1,
+                            borderDash: [10, 5]
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    scales: {
+                        y: {
+                            beginAtZero: false,
+                            title: {
+                                display: true,
+                                text: '금액 (단위: 원)'
+                            }
+                        }
+                    },
+                    plugins: {
+                        title: {
+                            display: true,
+                            text: '수익 금액 ytd'
+                        },
+                        tooltip: {
+                            callbacks: {
+                                label: function(context) {
+                                    return `${context.dataset.label}: ${context.parsed.y.toFixed(4)}`;
+                                }
+                            }
+                        }
+                    }
+                }
+            });
 
             // dataset2 초기화 및 데이터 생성 부분
             var targetGrowth = 1.004867;
@@ -686,7 +800,8 @@
             myChart2.data.labels = filteredData.map(data => data.date);
             myChart2.data.datasets[0].data = filteredData.map(data => data.targetMoney);
             myChart2.data.datasets[1].data = filteredData.map(data => data.currentMoney);
-            myChart2.data.datasets[2].data = filteredData.map(data => data.inflationAdjustedTarget);
+            myChart2.data.datasets[2].data = filteredData.map(data => data.subLine);
+            myChart2.data.datasets[3].data = filteredData.map(data => data.inflationAdjustedTarget);
 
             myChart2.update(); // 차트 업데이트
         }
