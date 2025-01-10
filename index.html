@@ -74,6 +74,7 @@
                     <div>평가 수익 : <span id="valuationAmount"></span></div>
                     <div>실현 손익 : <span id="realizedProfitLoss"></span></div>
                     <div>배당 수입 : <span id="dividendIncome"></span></div>
+                    <div>합계 : <span id="total"></span></div>
                 </div>
             </div>
              <!-- Tab 2 -->
@@ -548,22 +549,24 @@
             let today = new Date();
             let todayFormatted = today.toISOString().split('T')[0].replaceAll("-","");
             let valuationAmount = 0;
+            let total;
             dataset.map((stock,i) => {
                 if(stock.averageCost){
                     valuationAmount += (stock.price - stock.averageCost)*stock.count;
                 }
             });
-
-
             let lastProfitData = profitDatas[profitDatas.length-1];
+            total = valuationAmount + lastProfitData.realizedProfitLoss + lastProfitData.dividendIncome;
             let nowData = {
                 "valuationAmount":valuationAmount,
                 "realizedProfitLoss":lastProfitData.realizedProfitLoss,
-                "dividendIncome":lastProfitData.dividendIncome
+                "dividendIncome":lastProfitData.dividendIncome,
+                "total":total
             };
             document.getElementById("valuationAmount").innerText = valuationAmount.toLocaleString();
             document.getElementById("realizedProfitLoss").innerText = lastProfitData.realizedProfitLoss.toLocaleString();
             document.getElementById("dividendIncome").innerText = lastProfitData.dividendIncome.toLocaleString();
+            document.getElementById("total").innerText = total.toLocaleString();
             //저장
             insertData('userDatas/'+userNumber+'/profit/'+todayFormatted, nowData);
 
@@ -609,6 +612,14 @@
                             fill: true,
                             tension: 0.1,
                             borderDash: [10, 5]
+                        },
+                        {
+                            label: '합계',
+                            data: profitDatas.map(data => data.total),
+                            borderColor: 'rgba(255, 255, 0, 1)',
+                            backgroundColor: 'rgba(255, 255, 0, 0.2)',
+                            fill: false,
+                            tension: 0.1
                         }
                     ]
                 },
@@ -631,7 +642,7 @@
                         tooltip: {
                             callbacks: {
                                 label: function(context) {
-                                    return `${context.dataset.label}: ${context.parsed.y.toFixed(4)}`;
+                                    return `${context.dataset.label}: ${context.parsed.y}`;
                                 }
                             }
                         }
