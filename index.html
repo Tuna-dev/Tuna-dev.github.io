@@ -173,12 +173,14 @@
                 let userStock = null;
                 while(userStock== null){
                     let userName = prompt('이름을 입력하세요', 'cho');
+                    if(userName == null){alert('조회할 이름이 없어 로직을 종료합니다.'); return;}
                     userStocks.forEach((data, index) => {
                         if (data.name === userName) {
                             userNumber=index;
                             userStock=data;
                         }
                     });
+                    console.log(userName);
                     if(userStock==null){
                         alert('해당하는 이름이 등록되어있지않습니다.')
                     }
