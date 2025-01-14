@@ -90,7 +90,7 @@
                     <label for="startDate">조회 시작 날짜:</label>
                     <input type="month" id="startDate" value="2024-01">
                     <label for="endDate">조회 종료 날짜:</label>
-                    <input type="month" id="endDate" value="2040-12">
+                    <input type="month" id="endDate" value="2034-12">
                     <button onclick="updateChart()">조회</button>
                 </div>
             </div>
@@ -658,6 +658,7 @@
             var lastMoney = 1;
             var monthlyInflationRate = 1.0020593; // 월간 인플레이션 0.20593%
             var targetFinalMoney = 8.6; // 현재기준 금액 
+            var retireLastMoney = 3.7;
 
             // 월별 인플레이션을 누적 적용하여 각 월에 목표 금액을 조정
             function inflationAdjustedTarget(futureValue, inflationRate, monthsElapsed) {
@@ -667,11 +668,10 @@
             // 현재부터 2040년 12월까지 남은 월 수 계산
             const currentYear = new Date().getFullYear();
             const currentMonth = new Date().getMonth();
-            const monthsTo2040 = (2040 - currentYear) * 12 + (11 - currentMonth); // 2040년 12월 기준
 
             function getMonthlyDatesForYears() {
                 const startDate = new Date(2024, 0, 1);
-                const endDate = new Date(2040, 11, 1);
+                const endDate = new Date(2093, 11, 1);
                 const monthlyDates = [];
 
                 let currentDate = startDate;
@@ -683,14 +683,18 @@
                 return monthlyDates;
             }
 
+            
+
             const dates = getMonthlyDatesForYears();
             dates.forEach((date, i) => {
                 dataset2.push({
                     date: date.toLocaleDateString('ko-KR', { year: 'numeric', month: 'long' }),
                     targetMoney: lastMoney * targetGrowth + targetSave,
-                    inflationAdjustedTarget: inflationAdjustedTarget(targetFinalMoney, monthlyInflationRate, i)
+                    inflationAdjustedTarget: inflationAdjustedTarget(targetFinalMoney, monthlyInflationRate, i),
+                    retireLimit: retireLastMoney * targetGrowth
                 });
                 lastMoney = dataset2[i].targetMoney;
+                retireLastMoney = dataset2[i].retireLimit;
             });
             let subLineIndex;
             for (let i = 0; i < moneyCurveDatas.length; i++) {
@@ -749,6 +753,14 @@
                             tension: 0.1
                         },
                         {
+                            label: '연금저축 한계선',
+                            data: dataset2.map(data => data.retireLimit),
+                            borderColor: 'rgba(255, 0, 255, 1)',
+                            backgroundColor: 'rgba(255, 0, 255, 0.2)',
+                            fill: true,
+                            tension: 0.1
+                        },
+                        {
                             label: '인플레이션 감안 목표 금액',
                             data: dataset2.map(data => data.inflationAdjustedTarget),
                             borderColor: 'rgba(54, 162, 235, 1)',
@@ -785,6 +797,7 @@
                     }
                 }
             });
+            updateChart();
         }
 
         function round(value, decimals) {
@@ -814,7 +827,8 @@
             myChart2.data.datasets[0].data = filteredData.map(data => data.targetMoney);
             myChart2.data.datasets[1].data = filteredData.map(data => data.currentMoney);
             myChart2.data.datasets[2].data = filteredData.map(data => data.subLine);
-            myChart2.data.datasets[3].data = filteredData.map(data => data.inflationAdjustedTarget);
+            myChart2.data.datasets[3].data = filteredData.map(data => data.retireLimit);
+            myChart2.data.datasets[4].data = filteredData.map(data => data.inflationAdjustedTarget);
 
             myChart2.update(); // 차트 업데이트
         }
