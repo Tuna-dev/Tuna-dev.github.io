@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>JSON Shift Tool</title>
+</head>
+<body>
+    <h1>JSON Shift Tool</h1>
+    <textarea id="inputJson" placeholder="Paste your JSON here" rows="20" cols="80"></textarea>
+    <br><br>
+    <button onclick="shiftJson()">Shift JSON</button>
+    <br><br>
+    <textarea id="outputJson" placeholder="Shifted JSON will appear here" rows="20" cols="80" readonly></textarea>
+
+    <script>
+        function shiftJson() {
+            try {
+                const inputText = document.getElementById('inputJson').value;
+                const jsonData = JSON.parse(inputText);
+
+                if (Array.isArray(jsonData)) {
+                    throw new Error('Input should be a single JSON object, not a list.');
+                }
+
+                const shiftedData = {
+                    ...jsonData,
+                    before4: jsonData.before3,
+                    before3: jsonData.before2,
+                    before2: jsonData.before1,
+                    before1: 0, // New data placeholder for "before"
+                    after4: jsonData.after3,
+                    after3: jsonData.after2,
+                    after2: jsonData.after1,
+                    after1: jsonData.before4 // Move "before4" data to "after1"
+                };
+
+                document.getElementById('outputJson').value = JSON.stringify(shiftedData, null, 4);
+            } catch (error) {
+                alert('Invalid JSON or wrong input format. Please input a single JSON object.');
+            }
+        }
+    </script>
+</body>
+</html>
