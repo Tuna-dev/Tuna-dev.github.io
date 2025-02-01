@@ -772,6 +772,11 @@
                     ]
                 },
                 options: {
+                    interaction: {
+                        mode: 'index', 
+                        axis: 'x',
+                        intersect: false,
+                    },
                     responsive: true,
                     scales: {
                         y: {
@@ -788,6 +793,7 @@
                             text: '목표달성률 트래킹 및 인플레이션 감안 목표선'
                         },
                         tooltip: {
+                            position: 'nearest',
                             callbacks: {
                                 label: function(context) {
                                     return `${context.dataset.label}: ${context.parsed.y.toFixed(4)}`;
