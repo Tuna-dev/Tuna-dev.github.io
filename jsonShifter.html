@@ -25,14 +25,14 @@
 
                 const shiftedData = {
                     ...jsonData,
-                    before4: jsonData.before3,
-                    before3: jsonData.before2,
-                    before2: jsonData.before1,
-                    before1: 0, // New data placeholder for "before"
-                    after4: jsonData.after3,
-                    after3: jsonData.after2,
-                    after2: jsonData.after1,
-                    after1: jsonData.before4 // Move "before4" data to "after1"
+                    before4: jsonData.after1,
+                    before3: jsonData.before4,
+                    before2: jsonData.before3,
+                    before1: jsonData.before2,
+                    after4: 0,
+                    after3: jsonData.after4,
+                    after2: jsonData.after3,
+                    after1: jsonData.after2
                 };
 
                 document.getElementById('outputJson').value = JSON.stringify(shiftedData, null, 4);
