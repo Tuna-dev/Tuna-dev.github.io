@@ -10,35 +10,101 @@
     <textarea id="inputJson" placeholder="Paste your JSON here" rows="20" cols="80"></textarea>
     <br><br>
     <button onclick="shiftJson()">Shift JSON</button>
+    <button onclick="refreshNetIncome()">Refresh Net Income</button>
+    <button onclick="copyToClipboard()">Copy Output</button>
     <br><br>
     <textarea id="outputJson" placeholder="Shifted JSON will appear here" rows="20" cols="80" readonly></textarea>
 
     <script>
-        function shiftJson() {
+        async function fetchNetIncome(ticker) {
+            try {
+                const response = await fetch(`https://finance.naver.com/item/main.nhn?code=${ticker}`);
+                const text = await response.text();
+                const parser = new DOMParser();
+                const doc = parser.parseFromString(text, 'text/html');
+                
+                // Net Income 값이 들어 있는 테이블의 위치를 찾아 추출
+                const netIncomeElement = doc.querySelector("#content .section.cop_analysis table tbody tr:nth-child(3) td:nth-child(11)");
+                
+                if (netIncomeElement) {
+                    return parseFloat(netIncomeElement.innerText.replace(/,/g, '')) || 0;
+                } else {
+                    return 0;
+                }
+            } catch (error) {
+                console.error(`Error fetching net income for ${ticker}:`, error);
+                return 0;
+            }
+        }
+
+        async function shiftJson() {
             try {
                 const inputText = document.getElementById('inputJson').value;
                 const jsonData = JSON.parse(inputText);
 
-                if (Array.isArray(jsonData)) {
-                    throw new Error('Input should be a single JSON object, not a list.');
+                if (!Array.isArray(jsonData)) {
+                    throw new Error('Input should be a JSON array of objects.');
                 }
 
-                const shiftedData = {
-                    ...jsonData,
-                    before4: jsonData.after1,
-                    before3: jsonData.before4,
-                    before2: jsonData.before3,
-                    before1: jsonData.before2,
-                    after4: 0,
-                    after3: jsonData.after4,
-                    after2: jsonData.after3,
-                    after1: jsonData.after2
-                };
-
+                const shiftedData = await Promise.all(jsonData.map(async (item) => {
+                    if (!item.ticker) {
+                        throw new Error('Each object must have a ticker.');
+                    }
+                    
+                    const latestNetIncome = await fetchNetIncome(item.ticker);
+                    
+                    return {
+                        ...item,
+                        before4: item.after1,
+                        before3: item.before4,
+                        before2: item.before3,
+                        before1: item.before2,
+                        after4: latestNetIncome,
+                        after3: item.after4,
+                        after2: item.after3,
+                        after1: item.after2
+                    };
+                }));
+                
                 document.getElementById('outputJson').value = JSON.stringify(shiftedData, null, 4);
             } catch (error) {
-                alert('Invalid JSON or wrong input format. Please input a single JSON object.');
+                alert(error.message);
             }
+        }
+
+        async function refreshNetIncome() {
+            try {
+                const inputText = document.getElementById('inputJson').value;
+                const jsonData = JSON.parse(inputText);
+
+                if (!Array.isArray(jsonData)) {
+                    throw new Error('Input should be a JSON array of objects.');
+                }
+
+                const updatedData = await Promise.all(jsonData.map(async (item) => {
+                    if (!item.ticker) {
+                        throw new Error('Each object must have a ticker.');
+                    }
+                    
+                    const latestNetIncome = await fetchNetIncome(item.ticker);
+                    
+                    return {
+                        ...item,
+                        after4: latestNetIncome
+                    };
+                }));
+                
+                document.getElementById('outputJson').value = JSON.stringify(updatedData, null, 4);
+            } catch (error) {
+                alert(error.message);
+            }
+        }
+
+        function copyToClipboard() {
+            const outputText = document.getElementById('outputJson');
+            outputText.select();
+            document.execCommand('copy');
+            alert('Copied to clipboard!');
         }
     </script>
 </body>
