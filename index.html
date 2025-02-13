@@ -333,9 +333,12 @@
                         
                         stock.growth = round(((afterTotal - beforeTotal) / beforeTotal) * 100, 2);
                         stock.performance = batchDataSpark[symbols[index]].chartPreviousClose;
-                        console.log(stock.id +" : " + stock.eps);
+                        console.log(data);
+                        console.log(stock.id +" per: " + stock.per+"배,  growth: " + stock.growth+"%  bookValue : " + data.bookValue );
                     }
-                    results.push(stock);
+                    if(stock.isOperatingMarginMet){
+                        results.push(stock);
+                    }
                 });
             }
             return results;

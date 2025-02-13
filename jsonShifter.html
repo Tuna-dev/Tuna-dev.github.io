@@ -36,7 +36,28 @@
                 return 0;
             }
         }
-
+        async function fetchIsOperatingMarginMet(ticker) {
+            try {
+                const response = await fetch(`https://finance.naver.com/item/main.nhn?code=${ticker}`);
+                const text = await response.text();
+                const parser = new DOMParser();
+                const doc = parser.parseFromString(text, 'text/html');
+                
+                // Net Income 값이 들어 있는 테이블의 위치를 찾아 추출
+                const operationMarginElement = doc.querySelector("#content .section.cop_analysis table tbody tr:nth-child(4) td:nth-child(11)");
+                
+                if (operationMarginElement) {
+                    const operationMargin = parseFloat(operationMarginElement.innerText.replace(/,/g, ''));
+                    if(isNaN(operationMargin)) return true;
+                    else return (operationMargin>15)?true:false;
+                } else {
+                    return true;
+                }
+            } catch (error) {
+                console.error(`Error fetching net income for ${ticker}:`, error);
+                return true;
+            }
+        }
         async function shiftJson() {
             try {
                 const inputText = document.getElementById('inputJson').value;
@@ -52,6 +73,7 @@
                     }
                     
                     const latestNetIncome = await fetchNetIncome(item.ticker);
+                    const isOperatingMarginMet = await fetchIsOperatingMarginMet(item.ticker);
                     
                     return {
                         ...item,
@@ -62,7 +84,8 @@
                         after4: latestNetIncome,
                         after3: item.after4,
                         after2: item.after3,
-                        after1: item.after2
+                        after1: item.after2,
+                        isOperatingMarginMet:isOperatingMarginMet
                     };
                 }));
                 
@@ -87,10 +110,11 @@
                     }
                     
                     const latestNetIncome = await fetchNetIncome(item.ticker);
-                    
+                    const isOperatingMarginMet = await fetchIsOperatingMarginMet(item.ticker);
                     return {
                         ...item,
-                        after4: latestNetIncome
+                        after4: latestNetIncome,
+                        isOperatingMarginMet:isOperatingMarginMet
                     };
                 }));
                 
