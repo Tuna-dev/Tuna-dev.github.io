@@ -348,14 +348,14 @@
         async function init() {
             dataset = await fetchStockData(stocks);
 
-            dataset = dataset.filter(item => item.growth >= item.per && item.per <= 25);
-
             for (let stock of dataset) {
                 stock.targetPrice = stock.price * Math.sqrt(Math.min(stock.growth, 25) / stock.per);
                 stock.point = stock.growth * (30 - stock.per);
+                if(stock.growth < stock.per || stock.per > 25){
+                    stock.point = 0;
+                }
             }
             const totalPoint = dataset.reduce((sum, stock) => sum + stock.point, 0);
-
             dataset.forEach(stock => {
                 stock.allocation = (stock.point / totalPoint) * 100;
                 stock.targetCount = Math.floor((totalSeed * stock.allocation / 100) / stock.price);
@@ -366,7 +366,7 @@
             while (remains > 0) {
                 let bought = false;
                 for (let stock of dataset) {
-                    if (remains >= stock.price) {
+                    if (remains >= stock.price && stock.point > 0) {
                         stock.targetCount++;
                         remains -= stock.price;
                         bought = true;
@@ -446,7 +446,7 @@
                     percentage: round(item.count * item.price / totalSeed * 100,2),
                     performanceRate:round((item.price - item.performance)/item.performance * 100,2)
                 };
-            });
+            }).filter(item => item.percentage > 0);
             new Chart(ctx1_now, {
                 type: 'treemap', // Treemap 타입 사용
                 data: {
@@ -503,7 +503,7 @@
                     percentage: round(item.targetCount * item.price / totalSeed * 100,2),
                     performanceRate:round((item.price - item.performance)/item.performance * 100,2)
                 };
-            });
+            }).filter(item => item.percentage > 0);
             new Chart(ctx1_after, {
                 type: 'treemap', // Treemap 타입 사용
                 data: {
