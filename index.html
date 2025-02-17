@@ -324,9 +324,8 @@
                     if (data) {
                         const beforeTotal = stock.before1 + stock.before2 + stock.before3 + stock.before4;
                         const afterTotal = stock.after1 + stock.after2 + stock.after3 + stock.after4;
-                        stock.eps = afterTotal*100000000/data.sharesOutstanding;
                         stock.price = data.regularMarketPrice;
-                        stock.per = round(stock.price / stock.eps, 2);
+                        stock.per = data.marketCap / (afterTotal * 100000000);
                         totalSeed += stock.price*stock.count;
                         totalSeedBefore += stock.price*stock.count;
                         stock.id = data.shortName;
