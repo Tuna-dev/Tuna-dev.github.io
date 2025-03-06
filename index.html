@@ -33,6 +33,21 @@
         .chart-container.active {
             display: block;
         }
+        span.line-border{
+            padding: 4px 8px;
+            font-size: x-small;
+            border-radius: 4px;
+            display: inline-block;
+            margin-left: 8px; 
+        }
+        span.red{
+            border: 1px solid #e60000; /* 빨간 테두리 */
+            color: #e60000; /* 글씨도 빨간색으로 */
+        }
+        span.blue{
+            border: 1px solid #007BFF; /* 파란색 테두리 */
+            color: #007BFF; /* 글씨도 파란색으로 */
+        }
     </style>
 </head>
 <body>
@@ -392,6 +407,8 @@
                     tradeDatas[index] = {};
                     tradeDatas[index].id = stock.id;
                     tradeDatas[index].tradeCount = stock.targetCount - stock.count;
+                    tradeDatas[index].targetCount = stock.targetCount;
+                    tradeDatas[index].count = stock.count;
                 }
             });
             tradeDatas.sort((a, b) => a.tradeCount - b.tradeCount);
@@ -405,7 +422,13 @@
                     tradeText += ' 매도';
                 }
                 html +='<h3 class="text-lg font-bold">'+tradeText+'</h3>';
-                html +='<p>수량 '+Math.abs(data.tradeCount)+'주</p>';
+                html +='<p>수량 '+Math.abs(data.tradeCount)+'주';
+                if(data.count==0 && data.targetCount > 0){
+                    html +='<span class="line-border red"> 신규 매수 </span>';
+                }else if(data.targetCount==0 && data.count > 0){
+                    html +='<span class="line-border blue"> 전량 매도 </span>';
+                }
+                html += '</p>';
                 html +='</div>';
             });
             document.getElementById("trade").innerHTML = html;
