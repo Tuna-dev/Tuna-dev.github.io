@@ -17,17 +17,17 @@
 
         // 주식 데이터
         var stockDatas = [
-            {"name":"SPY", "ticker":"SPLG", count:97, "price":0, dollerYn:"Y", parentTicker:"SPY"},
-            {"name":"TLT", "ticker":"TLT", count:326, "price":0, dollerYn:"Y", parentTicker:"TLT"},
+            {"name":"SPY", "ticker":"SPLG", count:107, "price":0, dollerYn:"Y", parentTicker:"SPY"},
+            {"name":"TLT", "ticker":"TLT", count:318, "price":0, dollerYn:"Y", parentTicker:"TLT"},
             {"name":"EPI", "ticker":"EPI", count:156, "price":0, dollerYn:"Y", parentTicker:"EPI"},
             {"name":"MOAT", "ticker":"MOAT", count:76, "price":0, dollerYn:"Y", parentTicker:"MOAT"},
             {"name":"spykr", "ticker":"379800", count:112, "price":0, dollerYn:"N", parentTicker:"SPY"},
-            {"name":"spykr[h]", "ticker":"449180", count:1503, "price":0, dollerYn:"N", parentTicker:"SPY"},
+            {"name":"spykr[h]", "ticker":"449180", count:1616, "price":0, dollerYn:"N", parentTicker:"SPY"},
             {"name":"tltkr", "ticker":"476760", count:0, "price":0, dollerYn:"N", parentTicker:"TLT"},
             {"name":"tltkr[h]", "ticker":"453850", count:364, "price":0, dollerYn:"N", parentTicker:"TLT"},
-            {"name":"moatkr", "ticker":"309230", count:43, "price":0, dollerYn:"N", parentTicker:"MOAT"},
-            {"name":"epikr", "ticker":"453810", count:134, "price":0, dollerYn:"N", parentTicker:"EPI"},
-            {"name":"asox", "ticker":"497570", count:1001, "price":0, dollerYn:"N", parentTicker:"ASOX"}
+            {"name":"moatkr", "ticker":"309230", count:46, "price":0, dollerYn:"N", parentTicker:"MOAT"},
+            {"name":"epikr", "ticker":"453810", count:136, "price":0, dollerYn:"N", parentTicker:"EPI"},
+            {"name":"asox", "ticker":"497570", count:1149, "price":0, dollerYn:"N", parentTicker:"ASOX"}
         ];
 
         // ETF 비율 설정
@@ -35,7 +35,7 @@
         var etfRatio = [0.30, 0.40, 0.1, 0.1, 0.1];
 
         // 원화 신규 투입금액
-        var krwAcc = 3000000;
+        var krwAcc = 0;
 
         // 실시간 데이터 가져오기
         async function fetchStockPrices(stocks) {
