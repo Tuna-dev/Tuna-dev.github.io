@@ -347,8 +347,24 @@
                         
                         stock.growth = round(((afterTotal - beforeTotal) / beforeTotal) * 100, 2);
                         stock.performance = batchDataSpark[symbols[index]].chartPreviousClose;
-                        console.log(data);
-                        console.log(stock.id +" per: " + stock.per+"배,  growth: " + stock.growth+"%  bookValue : " + data.bookValue );
+                        console.log(stock.id +" per: " + stock.per+"배,  growth: " + stock.growth+"%" );
+                        let idea = stock.id + ": ";
+                        if(data.marketCap < 10000000000000){
+                            idea += "시총기준 미달 , ";
+                        }else{
+                            idea += "시총기준 적합 , ";
+                        }
+                        if(stock.per >= 25){
+                            idea += "per 기준 과열 , ";
+                        }else{
+                            idea += "per 기준 적합 , ";
+                        }
+                        if(stock.per > stock.growth){
+                            idea += "PEG 기준 미달";
+                        }else{
+                            idea += "PEG 기준 적합";
+                        }
+                        console.log(idea);
                     }
                     if(stock.isOperatingMarginMet){
                         results.push(stock);
@@ -361,11 +377,10 @@
 
         async function init() {
             dataset = await fetchStockData(stocks);
-
             for (let stock of dataset) {
                 stock.targetPrice = stock.price * Math.sqrt(Math.min(stock.growth, 25) / stock.per);
                 stock.point = stock.growth * (30 - stock.per);
-                if(stock.growth < stock.per || stock.per > 25){
+                if(stock.growth < stock.per || (stock.count > 0 && stock.per > 25) || (stock.count == 0 && stock.per > 27)){
                     stock.point = 0;
                 }
             }
