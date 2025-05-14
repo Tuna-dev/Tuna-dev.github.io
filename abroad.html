@@ -18,21 +18,31 @@
         // 주식 데이터
         var stockDatas = [
             {"name":"SPY", "ticker":"SPLG", count:107, "price":0, dollerYn:"Y", parentTicker:"SPY"},
-            {"name":"TLT", "ticker":"TLT", count:318, "price":0, dollerYn:"Y", parentTicker:"TLT"},
+            {"name":"BND", "ticker":"BND", count:0, "price":0, dollerYn:"Y", parentTicker:"BND"},
             {"name":"EPI", "ticker":"EPI", count:156, "price":0, dollerYn:"Y", parentTicker:"EPI"},
-            {"name":"MOAT", "ticker":"MOAT", count:76, "price":0, dollerYn:"Y", parentTicker:"MOAT"},
+            {"name":"QLD", "ticker":"QLD", count:429, "price":0, dollerYn:"Y", parentTicker:"QLD"},
             {"name":"spykr", "ticker":"379800", count:112, "price":0, dollerYn:"N", parentTicker:"SPY"},
             {"name":"spykr[h]", "ticker":"449180", count:1616, "price":0, dollerYn:"N", parentTicker:"SPY"},
-            {"name":"tltkr", "ticker":"476760", count:0, "price":0, dollerYn:"N", parentTicker:"TLT"},
-            {"name":"tltkr[h]", "ticker":"453850", count:364, "price":0, dollerYn:"N", parentTicker:"TLT"},
-            {"name":"moatkr", "ticker":"309230", count:46, "price":0, dollerYn:"N", parentTicker:"MOAT"},
             {"name":"epikr", "ticker":"453810", count:136, "price":0, dollerYn:"N", parentTicker:"EPI"},
-            {"name":"asox", "ticker":"497570", count:1149, "price":0, dollerYn:"N", parentTicker:"ASOX"}
+            {"name":"asox", "ticker":"497570", count:1686, "price":0, dollerYn:"N", parentTicker:"ASOX"},
+            {"name":"qldkr", "ticker":"418660", count:0, "price":0, dollerYn:"N", parentTicker:"QLD"},
+            {"name":"qldkr[h]", "ticker":"409820", count:2352, "price":0, dollerYn:"N", parentTicker:"QLD"}
         ];
 
         // ETF 비율 설정
-        var etfName = ['SPY', 'TLT', 'EPI', 'MOAT', 'ASOX']; 
-        var etfRatio = [0.30, 0.40, 0.1, 0.1, 0.1];
+        var etfName = ['SPY', 'BND', 'EPI', 'ASOX', 'QLD']; 
+        var fearGreed = 62;
+        var hadgeRatio = fearGreed*0.005;
+        var agressiveRatio = 1-hadgeRatio;
+        var indiaRatio = agressiveRatio*0.1;
+        var techRatio = agressiveRatio*0.1;
+        var spyRatio = agressiveRatio*0.8;
+        var etfRatio = [spyRatio, hadgeRatio, indiaRatio, techRatio, 0];
+        console.log('ratio 확인');
+        console.log('spyRatio : ' + spyRatio);
+        console.log('hadgeRatio : ' + hadgeRatio);
+        console.log('indiaRatio : ' + indiaRatio);
+        console.log('techRatio : ' + techRatio);
 
         // 원화 신규 투입금액
         var krwAcc = 0;
