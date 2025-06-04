@@ -11,6 +11,7 @@
         <canvas id="myChart1" width="400" height="200"></canvas>
         <span>변동내역 : <span id="change"></span></span></br></br>
         <span>환헷지 전략 : <span id="exchange"></span></span></br></br>
+        <span>탈출가격 : <span id="escape"></span></span></br></br>
     </div>
 
     <script>
@@ -21,7 +22,7 @@
             {"name":"BND", "ticker":"BND", count:0, "price":0, dollerYn:"Y", parentTicker:"BND"},
             {"name":"EPI", "ticker":"EPI", count:156, "price":0, dollerYn:"Y", parentTicker:"EPI"},
             {"name":"QLD", "ticker":"QLD", count:429, "price":0, dollerYn:"Y", parentTicker:"QLD"},
-            {"name":"spykr", "ticker":"379800", count:112, "price":0, dollerYn:"N", parentTicker:"SPY"},
+            {"name":"spykr", "ticker":"379800", count:166, "price":0, dollerYn:"N", parentTicker:"SPY"},
             {"name":"spykr[h]", "ticker":"449180", count:1616, "price":0, dollerYn:"N", parentTicker:"SPY"},
             {"name":"epikr", "ticker":"453810", count:136, "price":0, dollerYn:"N", parentTicker:"EPI"},
             {"name":"asox", "ticker":"497570", count:1686, "price":0, dollerYn:"N", parentTicker:"ASOX"},
@@ -30,8 +31,9 @@
         ];
 
         // ETF 비율 설정
+        var isDroppedCase = true;
         var etfName = ['SPY', 'BND', 'EPI', 'ASOX', 'QLD']; 
-        var fearGreed = 62;
+        var fearGreed = 65;
         var hadgeRatio = fearGreed*0.005;
         var agressiveRatio = 1-hadgeRatio;
         var indiaRatio = agressiveRatio*0.1;
@@ -48,13 +50,13 @@
         var krwAcc = 0;
 
         // 실시간 데이터 가져오기
+        // 기존 fetchStockPrices 함수 내에서 QQQ의 52주 고점 대비 하락률까지 계산하도록 수정
         async function fetchStockPrices(stocks) {
             try {
                 for (let i = 0; i < stocks.length; i++) {
                     const stock = stocks[i];
-                    
+
                     if (stock.dollerYn === "Y") {
-                        // 해외 주식은 marketwatch에서 가져옴
                         const url = `https://www.marketwatch.com/investing/fund/${stock.ticker}`;
                         const response = await fetch(url, {
                             headers: {
@@ -64,24 +66,47 @@
 
                         if (!response.ok) {
                             console.error(`Failed to fetch data for ${stock.ticker}. Status: ${response.status}`);
-                            return;
+                            continue;
                         }
 
                         const text = await response.text();
-                        const priceRegex = /<bg-quote[^>]*class="value"[^>]*>([\d,\.]+)<\/bg-quote>/;
-                        const match = text.match(priceRegex);
 
-                        if (match) {
-                            stock.price = parseFloat(match[1].replace(/,/g, ""));
+                        // 현재 가격 파싱
+                        const priceRegex = /<bg-quote[^>]*class="value"[^>]*>([\d,\.]+)<\/bg-quote>/;
+                        const priceMatch = text.match(priceRegex);
+
+                        if (priceMatch) {
+                            stock.price = parseFloat(priceMatch[1].replace(/,/g, ""));
                             console.log(`Latest price for ${stock.ticker}: ${stock.price}`);
                         } else {
-                            console.error(`Could not find price for ${ticker}. Possible page structure change.`);
+                            console.error(`Could not find price for ${stock.ticker}`);
+                        }
+                        if (stock.ticker === "QQQ") {
+                            const parser = new DOMParser();
+                            const doc = parser.parseFromString(text, "text/html");
+                            const kvItems = doc.querySelectorAll("li.kv__item");
+
+                            for (let item of kvItems) {
+                                const label = item.querySelector("small");
+                                const value = item.querySelector("span.primary");
+
+                                if (label && value && label.textContent.includes("52 Week Range")) {
+                                    const rangeText = value.textContent.trim(); // 예: "402.39 - 540.81"
+                                    const parts = rangeText.split(" - ");
+                                    if (parts.length === 2) {
+                                        const high = parseFloat(parts[1].replace(/,/g, ""));
+                                        const current = stock.price;
+                                        const drop = ((current - high) / high * 100).toFixed(2);
+                                        stock.dropPercentage = drop;
+                                        console.log(`QQQ 52주 고점 대비 하락률: ${drop}%`);
+                                    }
+                                    break;
+                                }
+                            }
                         }
                     } else {
-                        // 한국 주식은 네이버 금융에서 가져옴
+                        // 한국 주식 처리 로직 그대로 유지
                         const url = `https://finance.naver.com/item/main.nhn?code=${stock.ticker}`;
-                        console.log(`Fetching data for ${stock.ticker} from ${url}`);
-
                         const response = await fetch(url);
                         if (!response.ok) {
                             console.error(`Failed to fetch data for ${stock.ticker}. Status: ${response.status}`);
@@ -106,6 +131,7 @@
                 console.error(`An error occurred while fetching stock prices:`, error);
             }
         }
+
 
         async function fetchExchangeRate() {
             try {
@@ -160,6 +186,11 @@
 
         async function init() {
             await fetchStockPrices(stockDatas);
+            var QQQ = [
+                {"name":"QQQ", "ticker":"QQQ", count:0, "price":0, dollerYn:"Y", parentTicker:"QQQ"},
+                {"name":"QLD", "ticker":"QLD", count:0, "price":0, dollerYn:"Y", parentTicker:"QLD"},
+            ];
+            await fetchStockPrices(QQQ);
             const exchangeRate = await fetchExchangeRate();
             const exchangeRate365 = await fetch365DayExchangeRate();
             console.log("실시간 환율:", exchangeRate);
@@ -197,10 +228,34 @@
 
             // 리밸런싱 금액 계산
             var moveStock = {};
+            var drop = Number(QQQ[0].dropPercentage);
+            if(isDroppedCase || drop <= -20){
+                //1.급락CASE
+                var ristTakeRatio = drop*-2/100;
+                console.log(ristTakeRatio);
+                for(i=0; i<etfRatio.length; i++){
+                    if(etfName[i] == "SPY"){
+                        etfRatio[i] =1-ristTakeRatio
+                    }else if(etfName[i] == "QLD"){
+                        etfRatio[i] = ristTakeRatio
+                    }else{
+                        etfRatio[i] = 0;
+                    }
+                }
+                console.log(100+drop);
+                var escapePrice = QQQ[1].price * 100/(100+(drop*2));
+                document.getElementById("escape").innerHTML = escapePrice;
+                
+                
+            }else{
+                //2.일반CASE
+            }
             etfName.forEach((name, i) => {
                 var targetValue = totalValue * etfRatio[i];
                 moveStock[name] = targetValue - parentAmounts[name];
             });
+
+            
 
             // 데이터셋 준비
             let dataset = etfName.map((name, i) => ({
