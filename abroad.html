@@ -18,11 +18,11 @@
 
         // 주식 데이터
         var stockDatas = [
-            {"name":"SPY", "ticker":"SPLG", count:107, "price":0, dollerYn:"Y", parentTicker:"SPY"},
+            {"name":"SPY", "ticker":"SPLG", count:205, "price":0, dollerYn:"Y", parentTicker:"SPY"},
             {"name":"BND", "ticker":"BND", count:0, "price":0, dollerYn:"Y", parentTicker:"BND"},
             {"name":"EPI", "ticker":"EPI", count:156, "price":0, dollerYn:"Y", parentTicker:"EPI"},
             {"name":"QLD", "ticker":"QLD", count:429, "price":0, dollerYn:"Y", parentTicker:"QLD"},
-            {"name":"spykr", "ticker":"379800", count:166, "price":0, dollerYn:"N", parentTicker:"SPY"},
+            {"name":"spykr", "ticker":"379800", count:502, "price":0, dollerYn:"N", parentTicker:"SPY"},
             {"name":"spykr[h]", "ticker":"449180", count:1616, "price":0, dollerYn:"N", parentTicker:"SPY"},
             {"name":"epikr", "ticker":"453810", count:136, "price":0, dollerYn:"N", parentTicker:"EPI"},
             {"name":"asox", "ticker":"497570", count:1686, "price":0, dollerYn:"N", parentTicker:"ASOX"},
@@ -33,7 +33,7 @@
         // ETF 비율 설정
         var isDroppedCase = true;
         var etfName = ['SPY', 'BND', 'EPI', 'ASOX', 'QLD']; 
-        var fearGreed = 65;
+        var fearGreed = 62;
         var hadgeRatio = fearGreed*0.005;
         var agressiveRatio = 1-hadgeRatio;
         var indiaRatio = agressiveRatio*0.1;
@@ -91,7 +91,7 @@
                                 const value = item.querySelector("span.primary");
 
                                 if (label && value && label.textContent.includes("52 Week Range")) {
-                                    const rangeText = value.textContent.trim(); // 예: "402.39 - 540.81"
+                                    const rangeText = value.textContent.trim(); 
                                     const parts = rangeText.split(" - ");
                                     if (parts.length === 2) {
                                         const high = parseFloat(parts[1].replace(/,/g, ""));
