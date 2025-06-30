@@ -18,22 +18,22 @@
 
         // 주식 데이터
         var stockDatas = [
-            {"name":"SPY", "ticker":"SPLG", count:205, "price":0, dollerYn:"Y", parentTicker:"SPY"},
-            {"name":"BND", "ticker":"BND", count:0, "price":0, dollerYn:"Y", parentTicker:"BND"},
+            {"name":"SPY", "ticker":"SPLG", count:372, "price":0, dollerYn:"Y", parentTicker:"SPY"},
+            {"name":"BND", "ticker":"BND", count:497, "price":0, dollerYn:"Y", parentTicker:"BND"},
             {"name":"EPI", "ticker":"EPI", count:156, "price":0, dollerYn:"Y", parentTicker:"EPI"},
-            {"name":"QLD", "ticker":"QLD", count:429, "price":0, dollerYn:"Y", parentTicker:"QLD"},
-            {"name":"spykr", "ticker":"379800", count:502, "price":0, dollerYn:"N", parentTicker:"SPY"},
+            {"name":"QLD", "ticker":"QLD", count:0, "price":0, dollerYn:"Y", parentTicker:"QLD"},
+            {"name":"spykr", "ticker":"379800", count:2397, "price":0, dollerYn:"N", parentTicker:"SPY"},
             {"name":"spykr[h]", "ticker":"449180", count:1616, "price":0, dollerYn:"N", parentTicker:"SPY"},
-            {"name":"epikr", "ticker":"453810", count:136, "price":0, dollerYn:"N", parentTicker:"EPI"},
-            {"name":"asox", "ticker":"497570", count:1686, "price":0, dollerYn:"N", parentTicker:"ASOX"},
+            {"name":"epikr", "ticker":"453810", count:179, "price":0, dollerYn:"N", parentTicker:"EPI"},
+            {"name":"asox", "ticker":"497570", count:1087, "price":0, dollerYn:"N", parentTicker:"ASOX"},
             {"name":"qldkr", "ticker":"418660", count:0, "price":0, dollerYn:"N", parentTicker:"QLD"},
-            {"name":"qldkr[h]", "ticker":"409820", count:2352, "price":0, dollerYn:"N", parentTicker:"QLD"}
+            {"name":"qldkr[h]", "ticker":"409820", count:0, "price":0, dollerYn:"N", parentTicker:"QLD"}
         ];
 
         // ETF 비율 설정
-        var isDroppedCase = true;
+        var isDroppedCase = false;
         var etfName = ['SPY', 'BND', 'EPI', 'ASOX', 'QLD']; 
-        var fearGreed = 62;
+        var fearGreed = 65;
         var hadgeRatio = fearGreed*0.005;
         var agressiveRatio = 1-hadgeRatio;
         var indiaRatio = agressiveRatio*0.1;
