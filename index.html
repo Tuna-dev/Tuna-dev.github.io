@@ -734,7 +734,8 @@
                     date: date.toLocaleDateString('ko-KR', { year: 'numeric', month: 'long' }),
                     targetMoney: lastMoney * targetGrowth + targetSave,
                     inflationAdjustedTarget: inflationAdjustedTarget(targetFinalMoney, monthlyInflationRate, i),
-                    retireLimit: retireLastMoney * targetGrowth
+                    retireLimit: retireLastMoney * targetGrowth,
+                    dateReal:date
                 });
                 lastMoney = dataset2[i].targetMoney;
                 retireLastMoney = dataset2[i].retireLimit;
@@ -749,7 +750,11 @@
             for (let i = subLineIndex+1; i < dataset2.length; i++) {
                 dataset2[i].subLine = dataset2[i-1].subLine* targetGrowth + targetSave;
                 if(dataset2[i].subLine >= dataset2[i].inflationAdjustedTarget && goalAchievementDate == null){
+                    const diffInMs = dataset2[i].dateReal.getTime() - new Date(1993, 10, 19).getTime();
+                    const msInYear = 1000 * 60 * 60 * 24 * 365;
+                    
                     goalAchievementDate = dataset2[i].date;
+                    goalAchievementDate += '/  해당 시점 나이 : ' + Math.floor(diffInMs / msInYear) + '세'
                 }
             }
             //목표달성률 (현재)

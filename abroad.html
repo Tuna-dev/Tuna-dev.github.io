@@ -40,11 +40,7 @@
         var techRatio = agressiveRatio*0.1;
         var spyRatio = agressiveRatio*0.8;
         var etfRatio = [spyRatio, hadgeRatio, indiaRatio, techRatio, 0];
-        console.log('ratio 확인');
-        console.log('spyRatio : ' + spyRatio);
-        console.log('hadgeRatio : ' + hadgeRatio);
-        console.log('indiaRatio : ' + indiaRatio);
-        console.log('techRatio : ' + techRatio);
+        
 
         // 원화 신규 투입금액
         var krwAcc = 0;
@@ -120,7 +116,7 @@
 
                         if (match) {
                             stock.price = parseFloat(match[1].replace(/,/g, ""));
-                            console.log(`${stock.ticker}: ${stock.price}`);
+                            kl(`${stock.ticker}: ${stock.price}`);
                         } else {
                             stock.price = 0;
                             console.error(`Could not find price for ${stock.ticker}. Possible page structure change.`);
@@ -191,6 +187,7 @@
                 {"name":"QLD", "ticker":"QLD", count:0, "price":0, dollerYn:"Y", parentTicker:"QLD"},
             ];
             await fetchStockPrices(QQQ);
+
             const exchangeRate = await fetchExchangeRate();
             const exchangeRate365 = await fetch365DayExchangeRate();
             console.log("실시간 환율:", exchangeRate);
@@ -221,8 +218,6 @@
                 stock.amount = amount;
                 parentAmounts[stock.parentTicker] += amount; // parentTicker 기준으로 합산
             });
-            console.log(stockDatas)
-            console.log(parentAmounts)
             // 총 보유 금액 계산
             var totalValue = Object.values(parentAmounts).reduce((a, b) => a + b, 0) + krwAcc;
 
@@ -232,7 +227,6 @@
             if(isDroppedCase || drop <= -20){
                 //1.급락CASE
                 var ristTakeRatio = drop*-2/100;
-                console.log(ristTakeRatio);
                 for(i=0; i<etfRatio.length; i++){
                     if(etfName[i] == "SPY"){
                         etfRatio[i] =1-ristTakeRatio
@@ -242,7 +236,6 @@
                         etfRatio[i] = 0;
                     }
                 }
-                console.log(100+drop);
                 var escapePrice = QQQ[1].price * 100/(100+(drop*2));
                 document.getElementById("escape").innerHTML = escapePrice;
                 
@@ -255,7 +248,10 @@
                 moveStock[name] = targetValue - parentAmounts[name];
             });
 
-            
+            console.log('ratio 확인');
+            for(let i=0; i<etfName.length; i++){
+                console.log(etfName[i] + 'Ratio : ' + etfRatio[i]*100 + '%');
+            }
 
             // 데이터셋 준비
             let dataset = etfName.map((name, i) => ({
