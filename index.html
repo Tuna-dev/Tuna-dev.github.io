@@ -102,6 +102,7 @@
                     <p><span>목표달성률 : <span id="goalAchievementRate"></span></span></p>
                     <p><span>기준값 대비 "<span id="goalOverPerformRate"></span>%" 초과달성 상황입니다.</span></p>
                     <p><span>목표달성 시점 : <span id="goalAchievementDate"></span></span></p>
+                    <p><span>지금 은퇴시 월 생활비 : <span id="curRetireMoney"></span></span></p>
                     <label for="startDate">조회 시작 날짜:</label>
                     <input type="month" id="startDate" value="2024-01">
                     <label for="endDate">조회 종료 날짜:</label>
@@ -768,7 +769,8 @@
             document.getElementById("goalOverPerformRate").innerText = Math.round(goalOverPerformRate * 10) / 10;
             //목표달성 시점
             document.getElementById("goalAchievementDate").innerText = goalAchievementDate;
-
+            //해당시점 금액
+            document.getElementById("curRetireMoney").innerText = getRetireMoney(lastData.currentMoney);
             // Chart.js를 사용하여 두 번째 그래프 그리기
             let ctx2 = document.getElementById('myChart2').getContext('2d');
             myChart2 = new Chart(ctx2, {
@@ -856,6 +858,38 @@
 
         function round(value, decimals) {
             return Number(Math.round(value + "e" + decimals) + "e-" + decimals);
+        }
+        function getRetireMoney(curMoney){
+            const capitalGainRate = 0.08;
+            const dividendRate = 0.01;
+            const withdrawalRate = 0.04;
+            const capitalGainTaxThreshold = 2500000;
+            const capitalGainTaxRate = 0.22;
+            const dividendTaxRate = 0.2709;
+            const financialIncomeThreshold = 10000000;
+            const healthInsuranceRate = 0.0709;
+            const longTermCareRate = 0.009;
+            //연간인출액
+            const annualWithdrawal = curMoney * withdrawalRate;
+            //연간 가격상승
+            const capitalGain = curMoney * capitalGainRate;
+            //양도세
+            const taxableCapitalGain = Math.max(0, capitalGain - capitalGainTaxThreshold);
+            const capitalGainTax = taxableCapitalGain * capitalGainTaxRate;
+            //순 인출액
+            const netWithdrawal = annualWithdrawal - capitalGainTax;
+            //배당 수익 및 세금
+            const dividendIncome = curMoney * dividendRate;
+            const dividendTax = dividendIncome * dividendTaxRate;
+            const netDividend = dividendIncome - dividendTax;
+            //총 금융소득
+            let totalFinancialIncome = netWithdrawal + netDividend;
+            if(totalFinancialIncome > financialIncomeThreshold){
+                const healthInsurancePremium = totalFinancialIncome * (healthInsuranceRate * longTermCareRate);
+                totalFinancialIncome -= healthInsurancePremium
+            }
+            const monthlyUsableAmount = totalFinancialIncome/12
+            return Math.round(monthlyUsableAmount);
         }
         // 차트 데이터를 업데이트하는 함수
         async function updateChart() {

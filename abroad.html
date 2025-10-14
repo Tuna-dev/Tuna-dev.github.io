@@ -18,14 +18,14 @@
 
         // 주식 데이터
         var stockDatas = [
-            {"name":"SPY", "ticker":"SPLG", count:155, "price":0, dollerYn:"Y", parentTicker:"SPY"},
-            {"name":"BND", "ticker":"BND", count:719, "price":0, dollerYn:"Y", parentTicker:"BND"},
+            {"name":"SPY", "ticker":"SPLG", count:560, "price":0, dollerYn:"Y", parentTicker:"SPY"},
+            {"name":"BND", "ticker":"BND", count:594, "price":0, dollerYn:"Y", parentTicker:"BND"},
             {"name":"EPI", "ticker":"EPI", count:156, "price":0, dollerYn:"Y", parentTicker:"EPI"},
             {"name":"QLD", "ticker":"QLD", count:0, "price":0, dollerYn:"Y", parentTicker:"QLD"},
             {"name":"spykr", "ticker":"379800", count:2765, "price":0, dollerYn:"N", parentTicker:"SPY"},
-            {"name":"spykr[h]", "ticker":"449180", count:1616, "price":0, dollerYn:"N", parentTicker:"SPY"},
-            {"name":"epikr", "ticker":"453810", count:115, "price":0, dollerYn:"N", parentTicker:"EPI"},
-            {"name":"asox", "ticker":"497570", count:972, "price":0, dollerYn:"N", parentTicker:"ASOX"},
+            {"name":"spykr[h]", "ticker":"449180", count:1025, "price":0, dollerYn:"N", parentTicker:"SPY"},
+            {"name":"epikr", "ticker":"453810", count:512, "price":0, dollerYn:"N", parentTicker:"EPI"},
+            {"name":"asox", "ticker":"497570", count:1264, "price":0, dollerYn:"N", parentTicker:"ASOX"},
             {"name":"qldkr", "ticker":"418660", count:0, "price":0, dollerYn:"N", parentTicker:"QLD"},
             {"name":"qldkr[h]", "ticker":"409820", count:0, "price":0, dollerYn:"N", parentTicker:"QLD"}
         ];
@@ -33,7 +33,7 @@
         // ETF 비율 설정
         var isDroppedCase = false;
         var etfName = ['SPY', 'BND', 'EPI', 'ASOX', 'QLD']; 
-        var fearGreed = 74;
+        var fearGreed = 29;
         var hadgeRatio = fearGreed*0.005;
         var agressiveRatio = 1-hadgeRatio;
         var indiaRatio = agressiveRatio*0.1;
