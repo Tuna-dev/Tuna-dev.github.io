@@ -377,324 +377,328 @@
 
 
         async function init() {
-            dataset = await fetchStockData(stocks);
-            for (let stock of dataset) {
-                stock.targetPrice = stock.price * Math.sqrt(Math.min(stock.growth, 25) / stock.per);
-                stock.point = stock.growth * (30 - stock.per);
-                if(stock.growth < stock.per || (stock.count > 0 && stock.per > 25) || (stock.count == 0 && stock.per > 27)){
-                    stock.point = 0;
-                }
-            }
-            const totalPoint = dataset.reduce((sum, stock) => sum + stock.point, 0);
-            dataset.forEach(stock => {
-                stock.allocation = (stock.point / totalPoint) * 100;
-                stock.targetCount = Math.floor((totalSeed * stock.allocation / 100) / stock.price);
-            });
-
-            let remains = totalSeed - dataset.reduce((sum, stock) => sum + (stock.targetCount * stock.price), 0);
-
-            while (remains > 0) {
-                let bought = false;
+            try {
+                dataset = await fetchStockData(stocks);
                 for (let stock of dataset) {
-                    if (remains >= stock.price && stock.point > 0) {
-                        stock.targetCount++;
-                        remains -= stock.price;
-                        bought = true;
+                    stock.targetPrice = stock.price * Math.sqrt(Math.min(stock.growth, 25) / stock.per);
+                    stock.point = stock.growth * (30 - stock.per);
+                    if(stock.growth < stock.per || (stock.count > 0 && stock.per > 25) || (stock.count == 0 && stock.per > 27)){
+                        stock.point = 0;
                     }
                 }
-                if (!bought) break;
-            }
-            // point 값을 기준으로 정렬
-            dataset = dataset.slice().sort((a, b) => b.point - a.point).filter((_, index) => index < 5); // 상위 5개만 남김;
-            document.getElementById("addingSeed").innerText = addingSeed.toLocaleString();
-            document.getElementById("totalSeed").innerText = totalSeed.toLocaleString();
-            
-            let targetPriceHtml = "";
-            dataset.forEach(stock => {
-                targetPriceHtml += `<p>${stock.id}: ${stock.price.toLocaleString()} → ${round(stock.targetPrice, 0).toLocaleString()} (${round((stock.targetPrice - stock.price) / stock.price * 100, 1)}%)</p>`;
-            });
-            document.getElementById("targetPrice").innerHTML = targetPriceHtml;
+                const totalPoint = dataset.reduce((sum, stock) => sum + stock.point, 0);
+                dataset.forEach(stock => {
+                    stock.allocation = (stock.point / totalPoint) * 100;
+                    stock.targetCount = Math.floor((totalSeed * stock.allocation / 100) / stock.price);
+                });
 
-            // 매수매도 ui 처리
-            let tradeDatas =[];
-            let html ='';
-            dataset.map((stock,index)=> {
-                if((stock.targetCount - stock.count) != 0){
-                    tradeDatas[index] = {};
-                    tradeDatas[index].id = stock.id;
-                    tradeDatas[index].tradeCount = stock.targetCount - stock.count;
-                    tradeDatas[index].targetCount = stock.targetCount;
-                    tradeDatas[index].count = stock.count;
-                }
-            });
-            tradeDatas.sort((a, b) => a.tradeCount - b.tradeCount);
-            tradeDatas.map((data)=>{
-                let tradeText = data.id;
-                if(data.tradeCount > 0){
-                    html += '<div class="bg-white text-red-500 rounded-lg shadow-md p-4 w-50">';
-                    tradeText += ' 매수';
-                }else{
-                    html += '<div class="bg-white text-blue-500 rounded-lg shadow-md p-4 w-50">';
-                    tradeText += ' 매도';
-                }
-                html +='<h3 class="text-lg font-bold">'+tradeText+'</h3>';
-                html +='<p>수량 '+Math.abs(data.tradeCount)+'주';
-                if(data.count==0 && data.targetCount > 0){
-                    html +='<span class="line-border red"> 신규 매수 </span>';
-                }else if(data.targetCount==0 && data.count > 0){
-                    html +='<span class="line-border blue"> 전량 매도 </span>';
-                }
-                html += '</p>';
-                html +='</div>';
-            });
-            document.getElementById("trade").innerHTML = html;
+                let remains = totalSeed - dataset.reduce((sum, stock) => sum + (stock.targetCount * stock.price), 0);
 
-            //월간 성과계산
-            let performanceRate;
-            let performanceValue=0;
-            let performanceRateN;
-            let performanceValueN=0;
-            
-            dataset.map((stock,i) => {
-                stock.performance = (stock.lastPrice == null)?stock.performance:stock.lastPrice;
-                performanceValue += (stock.price - stock.performance) * stock.count;
-                performanceValueN += (stock.price - stock.performance) * stock.targetCount;
-                // performanceValue += (stock.price - lastPrice) * stock.count;
-                // performanceValueN += (stock.price - lastPrice) * stock.targetCount;
-            });
-            performanceRate = round(performanceValue / (totalSeedBefore - performanceValue) * 100 , 2);
-            performanceRateN = round(performanceValueN / (totalSeed - performanceValueN) * 100 , 2);
-            document.getElementById("performanceRate").innerHTML = performanceRate;
-            document.getElementById("performanceValue").innerHTML = performanceValue.toLocaleString();
-            document.getElementById("performanceRateN").innerHTML = performanceRateN;
-            document.getElementById("performanceValueN").innerHTML = performanceValueN.toLocaleString();
-            // 랜덤 색상을 생성하는 유틸리티 함수
-            function getColorFromValue(value) {
-                const clampedValue = Math.max(-20, Math.min(20, value));
-                const alpha = Math.abs(clampedValue) / 20;
-                const red = clampedValue > 0 ? 255 : 0;
-                const blue = clampedValue < 0 ? 255 : 0;
-                const green = 0;
-                return `rgba(${red}, ${green}, ${blue}, ${alpha})`;
-            }
-            let ctx1_now = document.getElementById("myChart1_now").getContext("2d");
-            const chartdata_now = dataset.map(item => {
-                return {
-                    id : item.id,
-                    percentage: round(item.count * item.price / totalSeed * 100,2),
-                    performanceRate:round((item.price - item.performance)/item.performance * 100,2)
-                };
-            }).filter(item => item.percentage > 0);
-            new Chart(ctx1_now, {
-                type: 'treemap', // Treemap 타입 사용
-                data: {
-                    datasets: [{
-                        label: '포트폴리오 분배',
-                        tree: chartdata_now,
-                        key: 'percentage', // 데이터에서 값 키 설정
-                        backgroundColor:(ctx1) => {
-                            if(ctx1.raw){
-                                const value = ctx1.raw._data.performanceRate; // 데이터의 값
-                                return getColorFromValue(value); // 색상 반환
-                            }
-                            
-                        },
-                        borderColor: 'rgba(0, 0, 0, 0.1)',
-                        borderWidth: 1
-                    }]
-                },
-                options: {
-                    plugins: {
-                        legend: {
-                            display: false // 범례 숨김
-                        },
-                        tooltip: {
-                            callbacks: {
-                                label: (tooltipItem) => {
-                                    const rawData = tooltipItem.raw._data;
-                                    return `지난 1개월: ${rawData.performanceRate}%`;
+                while (remains > 0) {
+                    let bought = false;
+                    for (let stock of dataset) {
+                        if (remains >= stock.price && stock.point > 0) {
+                            stock.targetCount++;
+                            remains -= stock.price;
+                            bought = true;
+                        }
+                    }
+                    if (!bought) break;
+                }
+                // point 값을 기준으로 정렬
+                dataset = dataset.slice().sort((a, b) => b.point - a.point).filter((_, index) => index < 5); // 상위 5개만 남김;
+                document.getElementById("addingSeed").innerText = addingSeed.toLocaleString();
+                document.getElementById("totalSeed").innerText = totalSeed.toLocaleString();
+                
+                let targetPriceHtml = "";
+                dataset.forEach(stock => {
+                    targetPriceHtml += `<p>${stock.id}: ${stock.price.toLocaleString()} → ${round(stock.targetPrice, 0).toLocaleString()} (${round((stock.targetPrice - stock.price) / stock.price * 100, 1)}%)</p>`;
+                });
+                document.getElementById("targetPrice").innerHTML = targetPriceHtml;
+
+                // 매수매도 ui 처리
+                let tradeDatas =[];
+                let html ='';
+                dataset.map((stock,index)=> {
+                    if((stock.targetCount - stock.count) != 0){
+                        tradeDatas[index] = {};
+                        tradeDatas[index].id = stock.id;
+                        tradeDatas[index].tradeCount = stock.targetCount - stock.count;
+                        tradeDatas[index].targetCount = stock.targetCount;
+                        tradeDatas[index].count = stock.count;
+                    }
+                });
+                tradeDatas.sort((a, b) => a.tradeCount - b.tradeCount);
+                tradeDatas.map((data)=>{
+                    let tradeText = data.id;
+                    if(data.tradeCount > 0){
+                        html += '<div class="bg-white text-red-500 rounded-lg shadow-md p-4 w-50">';
+                        tradeText += ' 매수';
+                    }else{
+                        html += '<div class="bg-white text-blue-500 rounded-lg shadow-md p-4 w-50">';
+                        tradeText += ' 매도';
+                    }
+                    html +='<h3 class="text-lg font-bold">'+tradeText+'</h3>';
+                    html +='<p>수량 '+Math.abs(data.tradeCount)+'주';
+                    if(data.count==0 && data.targetCount > 0){
+                        html +='<span class="line-border red"> 신규 매수 </span>';
+                    }else if(data.targetCount==0 && data.count > 0){
+                        html +='<span class="line-border blue"> 전량 매도 </span>';
+                    }
+                    html += '</p>';
+                    html +='</div>';
+                });
+                document.getElementById("trade").innerHTML = html;
+
+                //월간 성과계산
+                let performanceRate;
+                let performanceValue=0;
+                let performanceRateN;
+                let performanceValueN=0;
+                
+                dataset.map((stock,i) => {
+                    stock.performance = (stock.lastPrice == null)?stock.performance:stock.lastPrice;
+                    performanceValue += (stock.price - stock.performance) * stock.count;
+                    performanceValueN += (stock.price - stock.performance) * stock.targetCount;
+                    // performanceValue += (stock.price - lastPrice) * stock.count;
+                    // performanceValueN += (stock.price - lastPrice) * stock.targetCount;
+                });
+                performanceRate = round(performanceValue / (totalSeedBefore - performanceValue) * 100 , 2);
+                performanceRateN = round(performanceValueN / (totalSeed - performanceValueN) * 100 , 2);
+                document.getElementById("performanceRate").innerHTML = performanceRate;
+                document.getElementById("performanceValue").innerHTML = performanceValue.toLocaleString();
+                document.getElementById("performanceRateN").innerHTML = performanceRateN;
+                document.getElementById("performanceValueN").innerHTML = performanceValueN.toLocaleString();
+                // 랜덤 색상을 생성하는 유틸리티 함수
+                function getColorFromValue(value) {
+                    const clampedValue = Math.max(-20, Math.min(20, value));
+                    const alpha = Math.abs(clampedValue) / 20;
+                    const red = clampedValue > 0 ? 255 : 0;
+                    const blue = clampedValue < 0 ? 255 : 0;
+                    const green = 0;
+                    return `rgba(${red}, ${green}, ${blue}, ${alpha})`;
+                }
+                let ctx1_now = document.getElementById("myChart1_now").getContext("2d");
+                const chartdata_now = dataset.map(item => {
+                    return {
+                        id : item.id,
+                        percentage: round(item.count * item.price / totalSeed * 100,2),
+                        performanceRate:round((item.price - item.performance)/item.performance * 100,2)
+                    };
+                }).filter(item => item.percentage > 0);
+                new Chart(ctx1_now, {
+                    type: 'treemap', // Treemap 타입 사용
+                    data: {
+                        datasets: [{
+                            label: '포트폴리오 분배',
+                            tree: chartdata_now,
+                            key: 'percentage', // 데이터에서 값 키 설정
+                            backgroundColor:(ctx1) => {
+                                if(ctx1.raw){
+                                    const value = ctx1.raw._data.performanceRate; // 데이터의 값
+                                    return getColorFromValue(value); // 색상 반환
                                 }
-                            }
-                        },
-                        datalabels: {
-                            color: 'black', // 레이블 텍스트 색상
-                            font: {
-                                weight: 'bold',
-                                size: 14
+                                
                             },
-                            formatter: (formatterItem) => {
-                                const dataItem = formatterItem._data; // 
-                                return `${dataItem.id}\n${dataItem.percentage}%`;
+                            borderColor: 'rgba(0, 0, 0, 0.1)',
+                            borderWidth: 1
+                        }]
+                    },
+                    options: {
+                        plugins: {
+                            legend: {
+                                display: false // 범례 숨김
                             },
-                            align: 'center', // 레이블 텍스트 정렬
-                            anchor: 'center' // 레이블 위치
-                        }
-                    }
-                },
-                plugins: [ChartDataLabels] // datalabels 플러그인 활성화
-            });
-
-            let ctx1_after = document.getElementById("myChart1_after").getContext("2d");
-            const chartdata_after = dataset.map(item => {
-                return {
-                    id : item.id,
-                    percentage: round(item.targetCount * item.price / totalSeed * 100,2),
-                    performanceRate:round((item.price - item.performance)/item.performance * 100,2)
-                };
-            }).filter(item => item.percentage > 0);
-            new Chart(ctx1_after, {
-                type: 'treemap', // Treemap 타입 사용
-                data: {
-                    datasets: [{
-                        label: '포트폴리오 분배',
-                        tree: chartdata_after,
-                        key: 'percentage', // 데이터에서 값 키 설정
-                        backgroundColor:(ctx1) => {
-                            if(ctx1.raw){
-                                const value = ctx1.raw._data.performanceRate; // 데이터의 값
-                                return getColorFromValue(value); // 색상 반환
-                            }
-                            
-                        },
-                        borderColor: 'rgba(0, 0, 0, 0.1)',
-                        borderWidth: 1
-                    }]
-                },
-                options: {
-                    plugins: {
-                        legend: {
-                            display: false // 범례 숨김
-                        },
-                        tooltip: {
-                            callbacks: {
-                                label: (tooltipItem) => {
-                                    const rawData = tooltipItem.raw._data;
-                                    return `지난 1개월: ${rawData.performanceRate}%`;
+                            tooltip: {
+                                callbacks: {
+                                    label: (tooltipItem) => {
+                                        const rawData = tooltipItem.raw._data;
+                                        return `지난 1개월: ${rawData.performanceRate}%`;
+                                    }
                                 }
-                            }
-                        },
-                        datalabels: {
-                            color: 'black', // 레이블 텍스트 색상
-                            font: {
-                                weight: 'bold',
-                                size: 14
                             },
-                            formatter: (formatterItem) => {
-                                const dataItem = formatterItem._data; // 
-                                return `${dataItem.id}\n${dataItem.percentage}%`;
-                            },
-                            align: 'center', // 레이블 텍스트 정렬
-                            anchor: 'center' // 레이블 위치
-                        }
-                    }
-                },
-                plugins: [ChartDataLabels] // datalabels 플러그인 활성화
-            });
-
-            // 수익 정보 노출 관련
-            let today = new Date();
-            let todayFormatted = today.toISOString().split('T')[0].replaceAll("-","");
-            let valuationAmount = 0;
-            let total;
-            dataset.map((stock,i) => {
-                if(stock.averageCost){
-                    valuationAmount += (stock.price - stock.averageCost)*stock.count;
-                }
-            });
-            let lastProfitData = profitDatas[profitDatas.length-1];
-            total = valuationAmount + lastProfitData.realizedProfitLoss + lastProfitData.dividendIncome;
-            let nowData = {
-                "valuationAmount":valuationAmount,
-                "realizedProfitLoss":lastProfitData.realizedProfitLoss,
-                "dividendIncome":lastProfitData.dividendIncome,
-                "total":total
-            };
-            document.getElementById("valuationAmount").innerText = valuationAmount.toLocaleString();
-            document.getElementById("realizedProfitLoss").innerText = lastProfitData.realizedProfitLoss.toLocaleString();
-            document.getElementById("dividendIncome").innerText = lastProfitData.dividendIncome.toLocaleString();
-            document.getElementById("total").innerText = total.toLocaleString();
-            //저장
-            insertData('userDatas/'+userNumber+'/profit/'+todayFormatted, nowData);
-
-            //오늘 데이터 추가
-            nowData.date = todayFormatted;
-            if(lastProfitData.date == todayFormatted){
-                profitDatas.pop();
-            }
-            profitDatas.push(nowData);
-            // 차트 그리기 profit
-            let ctxProfit = document.getElementById('profit').getContext('2d');
-            myChart2 = new Chart(ctxProfit, {
-                type: 'line',
-                data: {
-                    labels: profitDatas.map(data => {
-                        let dateStr = data.date.toString();  // yyyymmdd 형식의 문자열
-                        let month = Number(dateStr.substring(4, 6));  // 월 부분 추출
-                        let day = Number(dateStr.substring(6, 8));    // 일 부분 추출
-                        return `${month}월 ${day}일`;  // mm월dd일 형식으로 변환
-                    }),
-                    datasets: [
-                        {
-                            label: '평가수익',
-                            data: profitDatas.map(data => data.valuationAmount),
-                            borderColor: 'rgba(75, 192, 192, 1)',
-                            backgroundColor: 'rgba(75, 192, 192, 0.2)',
-                            fill: true,
-                            tension: 0.1
-                        },
-                        {
-                            label: '실현손익',
-                            data: profitDatas.map(data => data.realizedProfitLoss),
-                            borderColor: 'rgba(255, 99, 132, 1)',
-                            backgroundColor: 'rgba(255, 99, 132, 0.2)',
-                            fill: true,
-                            tension: 0.1
-                        },
-                        {
-                            label: '배당수익',
-                            data: profitDatas.map(data => data.dividendIncome),
-                            borderColor: 'rgba(54, 162, 235, 1)',
-                            backgroundColor: 'rgba(54, 162, 235, 0.2)',
-                            fill: true,
-                            tension: 0.1,
-                            borderDash: [10, 5]
-                        },
-                        {
-                            label: '합계',
-                            data: profitDatas.map(data => data.total),
-                            borderColor: 'rgba(255, 255, 0, 1)',
-                            backgroundColor: 'rgba(255, 255, 0, 0.2)',
-                            fill: true,
-                            tension: 0.1
-                        }
-                    ]
-                },
-                options: {
-                    responsive: true,
-                    scales: {
-                        y: {
-                            beginAtZero: false,
-                            title: {
-                                display: true,
-                                text: '금액 (단위: 원)'
+                            datalabels: {
+                                color: 'black', // 레이블 텍스트 색상
+                                font: {
+                                    weight: 'bold',
+                                    size: 14
+                                },
+                                formatter: (formatterItem) => {
+                                    const dataItem = formatterItem._data; // 
+                                    return `${dataItem.id}\n${dataItem.percentage}%`;
+                                },
+                                align: 'center', // 레이블 텍스트 정렬
+                                anchor: 'center' // 레이블 위치
                             }
                         }
                     },
-                    plugins: {
-                        title: {
-                            display: true,
-                            text: '수익 금액 ytd'
+                    plugins: [ChartDataLabels] // datalabels 플러그인 활성화
+                });
+
+                let ctx1_after = document.getElementById("myChart1_after").getContext("2d");
+                const chartdata_after = dataset.map(item => {
+                    return {
+                        id : item.id,
+                        percentage: round(item.targetCount * item.price / totalSeed * 100,2),
+                        performanceRate:round((item.price - item.performance)/item.performance * 100,2)
+                    };
+                }).filter(item => item.percentage > 0);
+                new Chart(ctx1_after, {
+                    type: 'treemap', // Treemap 타입 사용
+                    data: {
+                        datasets: [{
+                            label: '포트폴리오 분배',
+                            tree: chartdata_after,
+                            key: 'percentage', // 데이터에서 값 키 설정
+                            backgroundColor:(ctx1) => {
+                                if(ctx1.raw){
+                                    const value = ctx1.raw._data.performanceRate; // 데이터의 값
+                                    return getColorFromValue(value); // 색상 반환
+                                }
+                                
+                            },
+                            borderColor: 'rgba(0, 0, 0, 0.1)',
+                            borderWidth: 1
+                        }]
+                    },
+                    options: {
+                        plugins: {
+                            legend: {
+                                display: false // 범례 숨김
+                            },
+                            tooltip: {
+                                callbacks: {
+                                    label: (tooltipItem) => {
+                                        const rawData = tooltipItem.raw._data;
+                                        return `지난 1개월: ${rawData.performanceRate}%`;
+                                    }
+                                }
+                            },
+                            datalabels: {
+                                color: 'black', // 레이블 텍스트 색상
+                                font: {
+                                    weight: 'bold',
+                                    size: 14
+                                },
+                                formatter: (formatterItem) => {
+                                    const dataItem = formatterItem._data; // 
+                                    return `${dataItem.id}\n${dataItem.percentage}%`;
+                                },
+                                align: 'center', // 레이블 텍스트 정렬
+                                anchor: 'center' // 레이블 위치
+                            }
+                        }
+                    },
+                    plugins: [ChartDataLabels] // datalabels 플러그인 활성화
+                });
+
+                // 수익 정보 노출 관련
+                let today = new Date();
+                let todayFormatted = today.toISOString().split('T')[0].replaceAll("-","");
+                let valuationAmount = 0;
+                let total;
+                dataset.map((stock,i) => {
+                    if(stock.averageCost){
+                        valuationAmount += (stock.price - stock.averageCost)*stock.count;
+                    }
+                });
+                let lastProfitData = profitDatas[profitDatas.length-1];
+                total = valuationAmount + lastProfitData.realizedProfitLoss + lastProfitData.dividendIncome;
+                let nowData = {
+                    "valuationAmount":valuationAmount,
+                    "realizedProfitLoss":lastProfitData.realizedProfitLoss,
+                    "dividendIncome":lastProfitData.dividendIncome,
+                    "total":total
+                };
+                document.getElementById("valuationAmount").innerText = valuationAmount.toLocaleString();
+                document.getElementById("realizedProfitLoss").innerText = lastProfitData.realizedProfitLoss.toLocaleString();
+                document.getElementById("dividendIncome").innerText = lastProfitData.dividendIncome.toLocaleString();
+                document.getElementById("total").innerText = total.toLocaleString();
+                //저장
+                insertData('userDatas/'+userNumber+'/profit/'+todayFormatted, nowData);
+
+                //오늘 데이터 추가
+                nowData.date = todayFormatted;
+                if(lastProfitData.date == todayFormatted){
+                    profitDatas.pop();
+                }
+                profitDatas.push(nowData);
+                // 차트 그리기 profit
+                let ctxProfit = document.getElementById('profit').getContext('2d');
+                myChart2 = new Chart(ctxProfit, {
+                    type: 'line',
+                    data: {
+                        labels: profitDatas.map(data => {
+                            let dateStr = data.date.toString();  // yyyymmdd 형식의 문자열
+                            let month = Number(dateStr.substring(4, 6));  // 월 부분 추출
+                            let day = Number(dateStr.substring(6, 8));    // 일 부분 추출
+                            return `${month}월 ${day}일`;  // mm월dd일 형식으로 변환
+                        }),
+                        datasets: [
+                            {
+                                label: '평가수익',
+                                data: profitDatas.map(data => data.valuationAmount),
+                                borderColor: 'rgba(75, 192, 192, 1)',
+                                backgroundColor: 'rgba(75, 192, 192, 0.2)',
+                                fill: true,
+                                tension: 0.1
+                            },
+                            {
+                                label: '실현손익',
+                                data: profitDatas.map(data => data.realizedProfitLoss),
+                                borderColor: 'rgba(255, 99, 132, 1)',
+                                backgroundColor: 'rgba(255, 99, 132, 0.2)',
+                                fill: true,
+                                tension: 0.1
+                            },
+                            {
+                                label: '배당수익',
+                                data: profitDatas.map(data => data.dividendIncome),
+                                borderColor: 'rgba(54, 162, 235, 1)',
+                                backgroundColor: 'rgba(54, 162, 235, 0.2)',
+                                fill: true,
+                                tension: 0.1,
+                                borderDash: [10, 5]
+                            },
+                            {
+                                label: '합계',
+                                data: profitDatas.map(data => data.total),
+                                borderColor: 'rgba(255, 255, 0, 1)',
+                                backgroundColor: 'rgba(255, 255, 0, 0.2)',
+                                fill: true,
+                                tension: 0.1
+                            }
+                        ]
+                    },
+                    options: {
+                        responsive: true,
+                        scales: {
+                            y: {
+                                beginAtZero: false,
+                                title: {
+                                    display: true,
+                                    text: '금액 (단위: 원)'
+                                }
+                            }
                         },
-                        tooltip: {
-                            callbacks: {
-                                label: function(context) {
-                                    return `${context.dataset.label}: ${context.parsed.y}`;
+                        plugins: {
+                            title: {
+                                display: true,
+                                text: '수익 금액 ytd'
+                            },
+                            tooltip: {
+                                callbacks: {
+                                    label: function(context) {
+                                        return `${context.dataset.label}: ${context.parsed.y}`;
+                                    }
                                 }
                             }
                         }
                     }
-                }
-            });
+                });
+            } catch (error) {
+                
+            }
 
             // dataset2 초기화 및 데이터 생성 부분
             var targetGrowth = 1.004867;
@@ -770,7 +774,8 @@
             //목표달성 시점
             document.getElementById("goalAchievementDate").innerText = goalAchievementDate;
             //해당시점 금액
-            document.getElementById("curRetireMoney").innerText = getRetireMoney(lastData.currentMoney);
+            const formatter = new Intl.NumberFormat('ko-KR', { style: 'currency', currency: 'KRW' });
+            document.getElementById("curRetireMoney").innerText = formatter.format(getRetireMoney(lastData.currentMoney));
             // Chart.js를 사용하여 두 번째 그래프 그리기
             let ctx2 = document.getElementById('myChart2').getContext('2d');
             myChart2 = new Chart(ctx2, {
@@ -860,7 +865,8 @@
             return Number(Math.round(value + "e" + decimals) + "e-" + decimals);
         }
         function getRetireMoney(curMoney){
-            const capitalGainRate = 0.08;
+            let realCurMoney = curMoney * 100000000;
+            console.log("curMoney : " + realCurMoney);
             const dividendRate = 0.01;
             const withdrawalRate = 0.04;
             const capitalGainTaxThreshold = 2500000;
@@ -870,25 +876,26 @@
             const healthInsuranceRate = 0.0709;
             const longTermCareRate = 0.009;
             //연간인출액
-            const annualWithdrawal = curMoney * withdrawalRate;
-            //연간 가격상승
-            const capitalGain = curMoney * capitalGainRate;
+            const annualWithdrawal = realCurMoney * withdrawalRate;
+            console.log("annualWithdrawal : " +annualWithdrawal);
             //양도세
-            const taxableCapitalGain = Math.max(0, capitalGain - capitalGainTaxThreshold);
+            const taxableCapitalGain = Math.max(0, annualWithdrawal - capitalGainTaxThreshold);
             const capitalGainTax = taxableCapitalGain * capitalGainTaxRate;
             //순 인출액
             const netWithdrawal = annualWithdrawal - capitalGainTax;
             //배당 수익 및 세금
-            const dividendIncome = curMoney * dividendRate;
+            const dividendIncome = realCurMoney * dividendRate;
             const dividendTax = dividendIncome * dividendTaxRate;
             const netDividend = dividendIncome - dividendTax;
             //총 금융소득
             let totalFinancialIncome = netWithdrawal + netDividend;
+            console.log("totalFinancialIncome : " +totalFinancialIncome);
             if(totalFinancialIncome > financialIncomeThreshold){
-                const healthInsurancePremium = totalFinancialIncome * (healthInsuranceRate * longTermCareRate);
+                const healthInsurancePremium = totalFinancialIncome * (healthInsuranceRate + longTermCareRate);
                 totalFinancialIncome -= healthInsurancePremium
             }
-            const monthlyUsableAmount = totalFinancialIncome/12
+            const monthlyUsableAmount = totalFinancialIncome / 12
+            console.log("monthlyUsableAmount : " +monthlyUsableAmount);
             return Math.round(monthlyUsableAmount);
         }
         // 차트 데이터를 업데이트하는 함수
