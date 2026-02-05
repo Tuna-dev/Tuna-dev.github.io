@@ -33,7 +33,7 @@
         // ETF 비율 설정
         var isDroppedCase = false;
         var etfName = ['SPY', 'BND', 'EPI', 'ASOX', 'QLD']; 
-        var fearGreed = 52;
+        var fearGreed = 55;
         var hadgeRatio = fearGreed*0.005;
         var agressiveRatio = 1-hadgeRatio;
         var indiaRatio = agressiveRatio*0.1;
@@ -44,6 +44,8 @@
 
         // 원화 신규 투입금액
         var krwAcc = 0;
+        // 달러 신규 투입금액
+        var usdAcc = 0;
 
         // 실시간 데이터 가져오기
         // 기존 fetchStockPrices 함수 내에서 QQQ의 52주 고점 대비 하락률까지 계산하도록 수정
@@ -219,7 +221,7 @@
                 parentAmounts[stock.parentTicker] += amount; // parentTicker 기준으로 합산
             });
             // 총 보유 금액 계산
-            var totalValue = Object.values(parentAmounts).reduce((a, b) => a + b, 0) + krwAcc;
+            var totalValue = Object.values(parentAmounts).reduce((a, b) => a + b, 0) + krwAcc + (usdAcc * exchangeRate);
 
             // 리밸런싱 금액 계산
             var moveStock = {};
