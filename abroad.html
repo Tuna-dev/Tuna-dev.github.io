@@ -7,8 +7,12 @@
 </head>
 <body>
     <div style="width: 80%; margin: auto;">
-        <h1>해외주식 포트폴리오 관리</h1>
-        <canvas id="myChart1" width="400" height="200"></canvas>
+        <h3>S&P 500 11개 섹터 1년 성과 (YoY)</h3>
+        <div style="height: 400px;"> <canvas id="sectorChart"></canvas>
+        </div>
+        <h3>해외주식 포트폴리오 관리</h3>
+        <div style="height: 400px;"> <canvas id="myChart1"></canvas>
+        </div>
         <span>변동내역 : <span id="change"></span></span></br></br>
         <span>환헷지 전략 : <span id="exchange"></span></span></br></br>
         <span>탈출가격 : <span id="escape"></span></span></br></br>
@@ -16,36 +20,148 @@
 
     <script>
 
+        async function fetchSectorPerformance() {
+            const results = [];
+            const sectorTickers = ["XLF", "XLK", "XLI", "XLY", "XLP", "XLV", "XLC", "XLU", "XLE", "XLB", "XLRE"];
+
+            for (const ticker of sectorTickers) {
+                try {
+                    // 데이터가 훨씬 잘 긁히는 Finviz 주소 사용
+                    const url = `https://finviz.com/quote.ashx?t=${ticker}`;
+                    const response = await fetch(url);
+                    const text = await response.text();
+
+                    const parser = new DOMParser();
+                    const doc = parser.parseFromString(text, "text/html");
+
+                    let performance = 0;
+
+                    // 1. Finviz의 표 안에서 "Perf Year" 텍스트를 가진 셀 찾기
+                    const tdElements = doc.querySelectorAll('td');
+                    for (let i = 0; i < tdElements.length; i++) {
+                        if (tdElements[i].textContent === "Perf Year") {
+                            // "Perf Year" 바로 다음 셀(td)에 수익률 숫자가 들어있음
+                            const valueStr = tdElements[i + 1].textContent.replace('%', '').trim();
+                            performance = parseFloat(valueStr);
+                            break;
+                        }
+                    }
+
+                    results.push({ ticker, performance });
+                    console.log(`[Finviz] ${ticker}: ${performance}%`);
+                } catch (e) {
+                    console.error(`[에러] ${ticker} 호출 실패:`, e);
+                    results.push({ ticker, performance: 0 });
+                }
+            }
+            return results;
+        }
+
+        const sectorDescriptions = {
+            "XLF": "금융 (은행, 보험, 증권 등)",
+            "XLK": "정보기술 (애플, 마이크로소프트 등 IT)",
+            "XLI": "산업재 (항공, 국방, 건설기계)",
+            "XLY": "임의소비재 (아마존, 테슬라 등 소비재)",
+            "XLP": "필수소비재 (음식료, 생활용품, 마트)",
+            "XLV": "헬스케어 (제약, 바이오, 의료기기)",
+            "XLC": "커뮤니케이션 (구글, 메타, 통신)",
+            "XLU": "유틸리티 (전기, 가스, 수도 등 공공서비스)",
+            "XLE": "에너지 (석유, 가스, 정유 기업)",
+            "XLB": "원자재 (화학, 광산, 금속, 종이)",
+            "XLRE": "부동산 (리츠, 부동산 개발 및 관리)"
+        };
+
+        function drawSectorChart(data) {
+            const canvas = document.getElementById("sectorChart");
+            if (!canvas) return;
+
+            data.sort((a, b) => b.performance - a.performance);
+
+            const ctx = canvas.getContext("2d");
+            if (window.mySectorChart) window.mySectorChart.destroy();
+
+            const worstTicker = data[data.length - 1].ticker;
+
+            window.mySectorChart = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: data.map(d => d.ticker),
+                    datasets: [{
+                        label: '1년 수익률 (%)',
+                        data: data.map(d => d.performance),
+                        backgroundColor: data.map(d => {
+                            if (d.ticker === worstTicker) return "rgba(255, 0, 0, 0.8)"; 
+                            return d.performance >= 0 ? "rgba(54, 162, 235, 0.5)" : "rgba(255, 99, 132, 0.5)";
+                        }),
+                        borderColor: data.map(d => {
+                            if (d.ticker === worstTicker) return "rgba(200, 0, 0, 1)";
+                            return d.performance >= 0 ? "rgba(54, 162, 235, 1)" : "rgba(255, 99, 132, 1)";
+                        }),
+                        borderWidth: 2
+                    }]
+                },
+                options: {
+                    indexAxis: 'y',
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { display: false },
+                        // 툴팁 설정 변경: 마우스 올리면 설명이 나오게 함
+                        tooltip: {
+                            callbacks: {
+                                title: (context) => {
+                                    const ticker = context[0].label;
+                                    return `${ticker}: ${sectorDescriptions[ticker]}`;
+                                },
+                                label: (context) => ` 수익률: ${context.raw}%`
+                            }
+                        }
+                    },
+                    scales: {
+                        x: { beginAtZero: true },
+                        y: {
+                            ticks: {
+                                // 왼쪽 티커 이름 뒤에 짧은 설명을 붙여서 표시
+                                callback: function(value, index) {
+                                    const ticker = this.getLabelForValue(index);
+                                    return `${ticker} (${sectorDescriptions[ticker].split(' ')[0]})`;
+                                }
+                            }
+                        }
+                    }
+                }
+            });
+        }
         // 주식 데이터
         var stockDatas = [
-            {"name":"SPY", "ticker":"SPYM", count:644, "price":0, dollerYn:"Y", parentTicker:"SPY"},
-            {"name":"BND", "ticker":"BND", count:514, "price":0, dollerYn:"Y", parentTicker:"BND"},
+            {"name":"SPY", "ticker":"SPYM", count:461, "price":0, dollerYn:"Y", parentTicker:"SPY"},
+            {"name":"BND", "ticker":"BND", count:517, "price":0, dollerYn:"Y", parentTicker:"BND"},
             {"name":"EPI", "ticker":"EPI", count:156, "price":0, dollerYn:"Y", parentTicker:"EPI"},
+            {"name":"LOW", "ticker":"XLRE", count:352, "price":0, dollerYn:"Y", parentTicker:"LOW"},
             {"name":"QLD", "ticker":"QLD", count:0, "price":0, dollerYn:"Y", parentTicker:"QLD"},
             {"name":"spykr", "ticker":"379800", count:3368, "price":0, dollerYn:"N", parentTicker:"SPY"},
-            {"name":"spykr[h]", "ticker":"449180", count:1175, "price":0, dollerYn:"N", parentTicker:"SPY"},
-            {"name":"epikr", "ticker":"453810", count:748, "price":0, dollerYn:"N", parentTicker:"EPI"},
-            {"name":"asox", "ticker":"497570", count:1348, "price":0, dollerYn:"N", parentTicker:"ASOX"},
+            {"name":"spykr[h]", "ticker":"449180", count:2669, "price":0, dollerYn:"N", parentTicker:"SPY"},
+            {"name":"epikr", "ticker":"453810", count:769, "price":0, dollerYn:"N", parentTicker:"EPI"},
             {"name":"qldkr", "ticker":"418660", count:0, "price":0, dollerYn:"N", parentTicker:"QLD"},
             {"name":"qldkr[h]", "ticker":"409820", count:0, "price":0, dollerYn:"N", parentTicker:"QLD"}
         ];
 
         // ETF 비율 설정
         var isDroppedCase = false;
-        var etfName = ['SPY', 'BND', 'EPI', 'ASOX', 'QLD']; 
-        var fearGreed = 55;
+        var etfName = ['SPY', 'BND', 'EPI', 'LOW', 'QLD']; 
+        var fearGreed = 41;
         var hadgeRatio = fearGreed*0.005;
         var agressiveRatio = 1-hadgeRatio;
         var indiaRatio = agressiveRatio*0.1;
-        var techRatio = agressiveRatio*0.1;
+        var lowRatio = agressiveRatio*0.1;
         var spyRatio = agressiveRatio*0.8;
-        var etfRatio = [spyRatio, hadgeRatio, indiaRatio, techRatio, 0];
+        var etfRatio = [spyRatio, hadgeRatio, indiaRatio, lowRatio, 0];
         
 
         // 원화 신규 투입금액
-        var krwAcc = 0;
+        var krwAcc = 37564;
         // 달러 신규 투입금액
-        var usdAcc = 0;
+        var usdAcc = 139.02;
 
         // 실시간 데이터 가져오기
         // 기존 fetchStockPrices 함수 내에서 QQQ의 52주 고점 대비 하락률까지 계산하도록 수정
@@ -183,6 +299,10 @@
         }
 
         async function init() {
+
+            const sectorData = await fetchSectorPerformance();
+            drawSectorChart(sectorData);
+
             await fetchStockPrices(stockDatas);
             var QQQ = [
                 {"name":"QQQ", "ticker":"QQQ", count:0, "price":0, dollerYn:"Y", parentTicker:"QQQ"},
@@ -265,6 +385,7 @@
 
             // 차트 생성
             const ctx1 = document.getElementById("myChart1").getContext("2d");
+
             new Chart(ctx1, {
                 type: "bar",
                 data: {
@@ -273,34 +394,53 @@
                         {
                             label: "현재 보유 금액",
                             data: dataset.map(stock => stock.currentAmount),
-                            backgroundColor: "rgba(255, 165, 0, 0.6)", 
-                            borderColor: "rgba(255, 165, 0, 1)", 
+                            // 섹터 차트의 기본 배경색 (회색톤)
+                            backgroundColor: "rgba(160, 174, 192, 0.6)", 
+                            borderColor: "rgba(160, 174, 192, 1)", 
+                            borderWidth: 1
                         },
                         {
                             label: "목표 금액",
                             data: dataset.map(stock => stock.targetAmount),
-                            backgroundColor: "rgba(75, 192, 192, 0.6)",
-                            borderColor: "rgba(75, 192, 192, 1)",
+                            // 섹터 차트의 긍정색 (하늘색톤)
+                            backgroundColor: "rgba(54, 162, 235, 0.2)",
+                            borderColor: "rgba(54, 162, 235, 1)",
+                            borderWidth: 1
                         },
                         {
                             label: "변동 금액",
                             data: dataset.map(stock => stock.moveAmount),
-                            backgroundColor: "rgba(153, 102, 255, 0.6)",
-                            borderColor: "rgba(153, 102, 255, 1)",
+                            // 변동 금액이 양수면 파랑, 음수면 빨강 (섹터 차트 로직과 동일)
+                            backgroundColor: dataset.map(stock => 
+                                stock.moveAmount >= 0 ? "rgba(54, 162, 235, 0.7)" : "rgba(255, 99, 132, 0.7)"
+                            ),
+                            borderColor: dataset.map(stock => 
+                                stock.moveAmount >= 0 ? "rgba(54, 162, 235, 1)" : "rgba(255, 99, 132, 1)"
+                            ),
+                            borderWidth: 1
                         },
                     ],
                 },
                 options: {
                     responsive: true,
+                    maintainAspectRatio: false,
                     plugins: {
                         title: {
                             display: true,
                             text: "해외 자산 배분 리밸런싱",
                         },
                     },
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            ticks: {
+                                // 숫자에 콤마 추가
+                                callback: (value) => value.toLocaleString()
+                            }
+                        }
+                    }
                 },
             });
-
             // 변동 내역 표시
             let changeHtml = "";
             dataset.forEach(stock => {
