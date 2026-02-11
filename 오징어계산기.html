@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <title>메이플랜드 파티 배정기 (메용20/샤프30 적용)</title>
+    <style>
+        body { font-family: 'Malgun Gothic', sans-serif; background-color: #f4f7f6; display: flex; justify-content: center; padding: 20px; }
+        .container { background: white; padding: 25px; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); width: 850px; }
+        h2 { text-align: center; color: #333; border-bottom: 2px solid #ff9100; padding-bottom: 10px; }
+        .player-row { border: 1px solid #eee; padding: 15px; border-radius: 8px; margin-bottom: 10px; background: #fafafa; }
+        .input-grid { display: flex; gap: 8px; align-items: center; }
+        input, select { flex: 1; padding: 8px; border: 1px solid #ddd; border-radius: 4px; font-size: 14px; }
+        button { width: 100%; padding: 15px; background-color: #ff9100; border: none; border-radius: 6px; color: white; font-size: 18px; font-weight: bold; cursor: pointer; margin-top: 15px; }
+        #result { margin-top: 25px; padding: 20px; background-color: #fff9e6; border-radius: 8px; display: none; }
+        table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+        th, td { padding: 12px; border-bottom: 1px solid #ddd; text-align: center; }
+        th { background-color: #ff9100; color: white; }
+        .highlight { color: #d32f2f; font-weight: bold; font-size: 1.1em; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h2>오징어 파티 층수 배정기 <span style="font-size: 0.5em;">(메용20 / 샤프30 적용)</span></h2>
+    
+    <div id="playerInputs">
+        <script>
+            for(let i=1; i<=4; i++) {
+                document.write(`
+                    <div class="player-row">
+                        <div class="input-grid">
+                            <strong>유저 ${i}</strong>
+                            <input type="text" id="name${i}" placeholder="이름" value="유저${i}">
+                            <input type="number" id="lv${i}" placeholder="레벨" value="${i == 2 ? 96 : (i == 3 ? 119 : 92)}">
+                            <input type="number" id="atk${i}" placeholder="노버프 스공" value="${i == 1 ? 1970 : (i == 2 ? 2051 : (i == 3 ? 2941 : 0))}">
+                            <select id="job${i}">
+                                <option value="hermit">허밋 (럭세+쉐파)</option>
+                                <option value="archer">궁수 (기존 로직)</option>
+                            </select>
+                        </div>
+                    </div>
+                `);
+            }
+        </script>
+    </div>
+
+    <button onclick="calculateParty()">파티 층수 자동 배정</button>
+
+    <div id="result">
+        <h3>📊 배정 결과 (리셀스퀴드 HP 49,000 / 방어 830)</h3>
+        <table>
+            <thead>
+                <tr>
+                    <th>배정 층수</th>
+                    <th>이름</th>
+                    <th>상세 (추정WA/LUK)</th>
+                    <th>평균 방컷</th>
+                </tr>
+            </thead>
+            <tbody id="resultBody"></tbody>
+        </table>
+    </div>
+</div>
+
+<script>
+    function calculateStats(baseMaxAtk, job, userLevel) {
+        const mobHp = 49000;
+        const mobDef = 830; // 몬스터 방어력
+        
+        // 레벨 차 보정 (기존 로직 유지)
+        const levelDiffValue = Math.max(0, 97 - userLevel); // 97레벨 몬스터 기준
+
+        let totalAvgDmg = 0;
+        let infoText = "";
+
+        if (job === "hermit") {
+            let targetDex = userLevel >= 100 ? 140 : 130;
+            let pureLuk = (userLevel * 5) + 97 - targetDex;
+            let wa = (baseMaxAtk * 100) / (pureLuk * 3.6 + targetDex + 19); 
+            const lukWithMW = pureLuk * 1.10;
+
+            const baseLine = (lukWithMW * 7.71) * wa * 0.01; 
+            const levelDiffValue = Math.max(0, 97 - userLevel);
+            const lvPenalty = (1 - 0.023 * levelDiffValue);
+            const defReductionBase = (mobDef * 0.01) / 0.8;
+
+            const mainLineDmg = Math.max(0, (baseLine * lvPenalty) - defReductionBase);
+            const shadowLineDmg = Math.max(0, (baseLine * 0.5 * lvPenalty) - defReductionBase);
+
+            totalAvgDmg = (mainLineDmg * 2) + (shadowLineDmg * 2) * 1.10;
+
+            infoText = `WA:${Math.round(wa)} / L:${Math.round(pureLuk)}`;
+        }else {
+            const maxAtk = baseMaxAtk * 1.055;
+            const avgSkillMult = 1.788; 
+            const mastery = 60;
+
+            let lineDmg = (maxAtk * avgSkillMult) * (1 + (mastery / 100) * 0.9) / 2;
+
+            const defReductionBase = (mobDef * 0.6) / (0.8 + 0.01 * mastery);
+            const lvPenalty = (1 - 0.0102 * levelDiffValue);
+
+            const mainLineDmg = Math.max(0, (lineDmg * lvPenalty) - defReductionBase);
+
+            totalAvgDmg = mainLineDmg * 4;
+            infoText = `궁수 로직 유지`;
+        }
+
+        return { 
+            nShot: Math.max(1, parseFloat((mobHp / totalAvgDmg).toFixed(2))),
+            info: infoText
+        };
+    }
+
+    function calculateParty() {
+        let players = [];
+        for(let i=1; i<=4; i++) {
+            const name = document.getElementById(`name${i}`).value || `유저${i}`;
+            const lv = parseInt(document.getElementById(`lv${i}`).value);
+            const atk = parseFloat(document.getElementById(`atk${i}`).value);
+            const job = document.getElementById(`job${i}`).value;
+            if(!isNaN(atk)) {
+                const res = calculateStats(atk, job, lv);
+                players.push({ name, ...res });
+            }
+        }
+        players.sort((a, b) => a.nShot - b.nShot);
+        const floorOrder = ["3층", "1층", "2층", "4층"];
+        const resultBody = document.getElementById('resultBody');
+        resultBody.innerHTML = '';
+        players.forEach((p, idx) => {
+            resultBody.innerHTML += `
+                <tr>
+                    <td style="font-weight:bold; color:#ff9100;">${floorOrder[idx] || '대기'}</td>
+                    <td>${p.name}</td>
+                    <td style="font-size:0.8em; color:#666;">${p.info}</td>
+                    <td class="highlight">${p.nShot}방</td>
+                </tr>`;
+        });
+        document.getElementById('result').style.display = 'block';
+    }
+</script>
+
+</body>
+</html>
