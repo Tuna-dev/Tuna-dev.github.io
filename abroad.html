@@ -159,9 +159,9 @@
         
 
         // 원화 신규 투입금액
-        var krwAcc = 37564;
+        var krwAcc = 0;
         // 달러 신규 투입금액
-        var usdAcc = 139.02;
+        var usdAcc = 0;
 
         // 실시간 데이터 가져오기
         // 기존 fetchStockPrices 함수 내에서 QQQ의 52주 고점 대비 하락률까지 계산하도록 수정
@@ -186,7 +186,7 @@
                         const text = await response.text();
 
                         // 현재 가격 파싱
-                        const priceRegex = /<bg-quote[^>]*class="value"[^>]*>([\d,\.]+)<\/bg-quote>/;
+                        const priceRegex = /<[a-z0-9-]+[^>]*class="[^"]*value[^"]*"[^>]*>\s*([\d,\.]+)\s*<\/[a-z0-9-]+>/i;
                         const priceMatch = text.match(priceRegex);
 
                         if (priceMatch) {
