@@ -16,6 +16,7 @@
         th, td { padding: 12px; border-bottom: 1px solid #ddd; text-align: center; }
         th { background-color: #ff9100; color: white; }
         .highlight { color: #d32f2f; font-weight: bold; font-size: 1.1em; }
+        #resultMemo { display: block;margin-top: 15px;font-family: Arial, Helvetica, sans-serif;background: white;font-size: 13px;}
     </style>
 </head>
 <body>
@@ -34,8 +35,9 @@
                             <input type="number" id="lv${i}" placeholder="레벨" value="${i == 2 ? 96 : (i == 3 ? 119 : 92)}">
                             <input type="number" id="atk${i}" placeholder="노버프 스공" value="${i == 1 ? 1970 : (i == 2 ? 2051 : (i == 3 ? 2941 : 0))}">
                             <select id="job${i}">
-                                <option value="hermit">허밋 (럭세+쉐파)</option>
-                                <option value="archer">궁수 (기존 로직)</option>
+                                <option value="hermit">허밋</option>
+                                <option value="ranger">레인저</option>
+                                <option value="sniper">저격수</option>
                             </select>
                         </div>
                     </div>
@@ -59,6 +61,8 @@
             </thead>
             <tbody id="resultBody"></tbody>
         </table>
+        <div id="resultText"></div>
+        <span id="resultMemo"></span>
     </div>
 </div>
 
@@ -119,15 +123,24 @@
             const lv = parseInt(document.getElementById(`lv${i}`).value);
             const atk = parseFloat(document.getElementById(`atk${i}`).value);
             const job = document.getElementById(`job${i}`).value;
+            const calcJob = (job === "hermit") ? "hermit" : "archer";
             if(!isNaN(atk)) {
-                const res = calculateStats(atk, job, lv);
-                players.push({ name, ...res });
+                const res = calculateStats(atk, calcJob, lv);
+                let jobTxt = "";
+                if(job === "hermit") jobTxt = "허밋";
+                else if(job === "ranger") jobTxt = "렌져";
+                else if(job === "sniper") jobTxt = "저격수";
+                players.push({ name,lv,atk,jobTxt, ...res });
             }
         }
         players.sort((a, b) => a.nShot - b.nShot);
         const floorOrder = ["3층", "1층", "2층", "4층"];
         const resultBody = document.getElementById('resultBody');
+        const resultText = document.getElementById('resultText');
+        const resultMemo = document.getElementById('resultMemo');
         resultBody.innerHTML = '';
+        resultText.innerHTML = '';
+        resultMemo.innerHTML = '';
         players.forEach((p, idx) => {
             resultBody.innerHTML += `
                 <tr>
@@ -136,6 +149,8 @@
                     <td style="font-size:0.8em; color:#666;">${p.info}</td>
                     <td class="highlight">${p.nShot}방</td>
                 </tr>`;
+            resultText.innerHTML += `${floorOrder[idx]}: ${p.name}\/ `;
+            resultMemo.innerHTML += `${p.lv}${p.jobTxt}\/${p.nShot}방<br>`;
         });
         document.getElementById('result').style.display = 'block';
     }
