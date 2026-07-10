@@ -588,11 +588,13 @@ function splitHedgePair(strategy, targetTotal, currentH, currentU) {
   } else if (strategy === "전량 언헷지 전환") {
     targetH = 0; targetU = targetTotal;
   } else if (strategy === "헷지(H) 매입") {
-    // 기존 언헷지 물량은 유지, 총액이 줄어든 경우에만 최소한으로 축소
-    targetU = Math.min(currentU, Math.max(targetTotal, 0));
+    // 헷지가 우선순위 자산: 목표금액이 줄어들 땐 언헷지부터 매도(0까지),
+    // 그래도 부족하면 헷지도 줄임. 늘어날 땐 증가분이 전부 헷지로 들어감.
+    targetU = Math.min(currentU, Math.max(0, targetTotal - currentH));
     targetH = targetTotal - targetU;
   } else { // 언헷지 매입
-    targetH = Math.min(currentH, Math.max(targetTotal, 0));
+    // 언헷지가 우선순위 자산: 대칭 로직
+    targetH = Math.min(currentH, Math.max(0, targetTotal - currentU));
     targetU = targetTotal - targetH;
   }
   return { targetH: targetH, targetU: targetU };
