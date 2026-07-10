@@ -219,7 +219,11 @@
         </div>
         <div class="field wide">
           <label>Twelve Data API Key (<a href="https://twelvedata.com/" target="_blank" style="color:var(--accent);">무료 발급</a>)</label>
-          <input type="text" id="in_apiKey" placeholder="여기에 API Key 붙여넣기" value="025049a7e53f4076ab98820811bdc518">
+          <input type="text" id="in_apiKey" placeholder="여기에 API Key 붙여넣기">
+        </div>
+        <div class="field wide">
+          <label>리밸런싱 강도 (%) — 이론적 목표치 중 실제로 실행할 비율</label>
+          <input type="number" id="in_intensity" min="0" max="100" value="100">
         </div>
       </div>
 
@@ -266,6 +270,7 @@
     <!-- 리밸런싱 추천 -->
     <div class="panel">
       <h2>리밸런싱 추천 (종목별 매수/매도 수량)</h2>
+      <div id="fxAlert" style="display:none; background:rgba(232,176,75,.12); border:1px solid var(--warn); border-radius:6px; padding:12px 14px; margin-bottom:14px; font-size:13px; line-height:1.6;"></div>
       <div class="stock-table-wrap">
         <table id="rebalanceTable">
           <thead>
@@ -287,11 +292,14 @@
       </div>
       <div class="assump">
         ※ 종목별 목표금액은 전체 포트폴리오(totalValue) 기준으로 먼저 계산합니다.<br>
-        ※ BND·LOW처럼 원화 상품이 없는 종목은 목표금액 전액을 달러 쪽에 배정합니다.<br>
+        ※ BND·LOW처럼 원화 상품이 없는 종목의 목표금액은 절대 깎지 않습니다 — 그 화폐 풀 전체보다 목표금액이 크면,
+        부족한 만큼 반대 화폐에서 환전해온 것으로 계산하고 위에 경고로 표시합니다. 이때 반대 화폐 쪽 유연 종목들은
+        그만큼 더 많이 매도되도록 자동 조정됩니다.<br>
         ※ SPY·EPI·QLD처럼 양쪽 화폐 상품이 모두 있는 종목은, 현재 보유 중인 달러:원화 비율을 유지하는 방향으로 1차 배정한 뒤
-        남은 달러/원화 예산에 정확히 맞도록 비례 조정합니다 — 이 과정에서 화폐 간 실제 교환은 발생하지 않습니다.<br>
+        남은 달러/원화 예산에 정확히 맞도록 비례 조정합니다.<br>
         ※ SPY/QLD의 헷지(H)·언헷지 원화 상품 간 배분은 현재 환헷지 전략에 따라 다르게 처리됩니다 —
-        "매입" 전략은 기존 물량은 유지한 채 신규 증가분만 해당 방향으로 편입하고, "전량 전환" 전략은 반대 방향 물량 전부를 목표 방향으로 이동시킵니다.
+        "매입" 전략은 기존 물량은 유지한 채 신규 증가분만 해당 방향으로 편입하고, "전량 전환" 전략은 반대 방향 물량 전부를 목표 방향으로 이동시킵니다.<br>
+        ※ "리밸런싱 강도"를 100%보다 낮추면, 목표금액은 그대로 두고 실제 추천 매매수량만 그 비율만큼만 실행하도록 축소합니다.
       </div>
     </div>
 
@@ -356,7 +364,8 @@ function readInputsIntoState(){
     fearGreed: Number(document.getElementById('in_fearGreed').value) || 0,
     krwAcc: Number(document.getElementById('in_krwAcc').value) || 0,
     usdAcc: Number(document.getElementById('in_usdAcc').value) || 0,
-    apiKey: apiKey
+    apiKey: apiKey,
+    intensity: Math.min(100, Math.max(0, Number(document.getElementById('in_intensity').value))) / 100 || 1
   };
 }
 
@@ -592,7 +601,8 @@ function splitHedgePair(strategy, targetTotal, currentH, currentU) {
 /* ==========================================================
    5. 리밸런싱 계산 (핵심)
    ========================================================== */
-function computeRebalance(stocks, etfNames, etfRatio, exchangeRate, krwAcc, usdAcc, hedgeStrategy, totalValue) {
+function computeRebalance(stocks, etfNames, etfRatio, exchangeRate, krwAcc, usdAcc, hedgeStrategy, totalValue, intensity) {
+  if (typeof intensity !== 'number' || isNaN(intensity)) intensity = 1;
   var byParent = {};
   etfNames.forEach(function(n){ byParent[n] = { usd: [], krw: [] }; });
 
@@ -627,8 +637,22 @@ function computeRebalance(stocks, etfNames, etfRatio, exchangeRate, krwAcc, usdA
     else if (!e.hasUsd && e.hasKrw) { e.usdTarget = 0; e.krwTarget = e.T; forcedKrw += e.T; }
   });
 
-  var remainUsd = usdPoolTotal - forcedUsd;
-  var remainKrw = krwPoolTotal - forcedKrw;
+  /* 2-1단계: 강제 배정 종목의 목표금액이 그 화폐 풀 전체보다 크면(예: 헷지비중 급등 시 BND),
+     목표금액은 절대 깎지 않고 — 부족분만큼 반대 화폐 풀에서 "환전"해온 것으로 간주한다.
+     이 환전 금액만큼 반대쪽 화폐 풀 총액이 줄어들어, 그 화폐의 유연 종목들(SPY/EPI/QLD 등)이
+     자연스럽게 더 많이 매도되도록 유도된다. */
+  var fxFromKrwToUsd = Math.max(0, forcedUsd - usdPoolTotal);
+  var fxFromUsdToKrw = Math.max(0, forcedKrw - krwPoolTotal);
+
+  var adjustedUsdPoolTotal = usdPoolTotal + fxFromKrwToUsd - fxFromUsdToKrw;
+  var adjustedKrwPoolTotal = krwPoolTotal + fxFromUsdToKrw - fxFromKrwToUsd;
+
+  var remainUsd = Math.max(0, adjustedUsdPoolTotal - forcedUsd);
+  var remainKrw = Math.max(0, adjustedKrwPoolTotal - forcedKrw);
+
+  var fxInfo = { amountKRW: 0, direction: null };
+  if (fxFromKrwToUsd > 1) { fxInfo = { amountKRW: fxFromKrwToUsd, direction: 'KRW_TO_USD' }; }
+  else if (fxFromUsdToKrw > 1) { fxInfo = { amountKRW: fxFromUsdToKrw, direction: 'USD_TO_KRW' }; }
 
   /* 3단계: 양쪽 화폐에 다 있는 종목(SPY, EPI, QLD)은 "현재 보유 중인 달러:원화 비율"을
      유지하는 방향으로 1차 배정한 뒤, 남은 예산(remainUsd/remainKrw)에 정확히 맞도록 스케일링.
@@ -654,13 +678,14 @@ function computeRebalance(stocks, etfNames, etfRatio, exchangeRate, krwAcc, usdA
   var results = [];
 
   function pushResult(s, targetAmount){
-    var moveKRW = targetAmount - s.amountKRW;
+    var fullMoveKRW = targetAmount - s.amountKRW;
+    var moveKRW = (fullMoveKRW * intensity) || 0;
     var shares;
     if (s.dollerYn === "Y") {
       var moveUSD = exchangeRate > 0 ? moveKRW / exchangeRate : 0;
-      shares = s.price > 0 ? Math.round(moveUSD / s.price) : 0;
+      shares = s.price > 0 ? (Math.round(moveUSD / s.price) || 0) : 0;
     } else {
-      shares = s.price > 0 ? Math.round(moveKRW / s.price) : 0;
+      shares = s.price > 0 ? (Math.round(moveKRW / s.price) || 0) : 0;
     }
     results.push({
       name: s.name, ticker: s.ticker, dollerYn: s.dollerYn,
@@ -683,7 +708,30 @@ function computeRebalance(stocks, etfNames, etfRatio, exchangeRate, krwAcc, usdA
     }
   });
 
-  return { results: results, usdPoolTotal: usdPoolTotal, krwPoolTotal: krwPoolTotal };
+  return { results: results, usdPoolTotal: usdPoolTotal, krwPoolTotal: krwPoolTotal, fxInfo: fxInfo };
+}
+
+function renderFxAlert(fxInfo, exchangeRate) {
+  var el = document.getElementById('fxAlert');
+  if (!fxInfo || fxInfo.amountKRW <= 0) {
+    el.style.display = 'none';
+    return;
+  }
+  var amountUSD = exchangeRate > 0 ? fxInfo.amountKRW / exchangeRate : 0;
+  var msg;
+  if (fxInfo.direction === 'KRW_TO_USD') {
+    msg = '⚠ 환전 필요: 목표 비중을 달성하려면 원화 자산 중 약 <b>' + Math.round(fxInfo.amountKRW).toLocaleString() +
+          '원(≈ $' + amountUSD.toFixed(0) + ')</b>을 매도해 달러로 환전해야 합니다. ' +
+          '달러 전용 종목(예: BND)의 목표금액이 현재 보유 달러 자산 총액을 초과하기 때문입니다. ' +
+          '아래 원화 종목들의 매도 추천에는 이 환전분이 이미 반영되어 있습니다.';
+  } else {
+    msg = '⚠ 환전 필요: 목표 비중을 달성하려면 달러 자산 중 약 <b>$' + (fxInfo.amountKRW / exchangeRate).toFixed(0) +
+          '(≈ ' + Math.round(fxInfo.amountKRW).toLocaleString() + '원)</b>을 매도해 원화로 환전해야 합니다. ' +
+          '원화 전용 종목의 목표금액이 현재 보유 달러 자산 총액을 초과하기 때문입니다. ' +
+          '아래 달러 종목들의 매도 추천에는 이 환전분이 이미 반영되어 있습니다.';
+  }
+  el.innerHTML = msg;
+  el.style.display = 'block';
 }
 
 function renderRebalanceTable(results) {
@@ -841,8 +889,9 @@ async function init() {
   document.getElementById("change").innerHTML = changeHtml.replace(/\n/g,'<br>');
 
   // ===== 종목별 실제 매수/매도 수량 계산 (화폐군 분리) =====
-  var reb = computeRebalance(stockMeta, etfName, etfRatio, exchangeRate, krwAcc, usdAcc, exchangeHtml, totalValue);
+  var reb = computeRebalance(stockMeta, etfName, etfRatio, exchangeRate, krwAcc, usdAcc, exchangeHtml, totalValue, inputs.intensity);
   renderRebalanceTable(reb.results);
+  renderFxAlert(reb.fxInfo, exchangeRate);
 
   status.textContent = (apiKey ? '' : '⚠ API Key 없음 — 달러 종목 가격 미조회. ') + '마지막 계산: ' + new Date().toLocaleTimeString('ko-KR');
 }
