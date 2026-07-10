@@ -217,6 +217,10 @@
           <label>달러 예수금 (USD)</label>
           <input type="number" id="in_usdAcc" value="203">
         </div>
+        <div class="field wide">
+          <label>Twelve Data API Key (<a href="https://twelvedata.com/" target="_blank" style="color:var(--accent);">무료 발급</a>)</label>
+          <input type="text" id="in_apiKey" placeholder="여기에 API Key 붙여넣기" value="025049a7e53f4076ab98820811bdc518">
+        </div>
       </div>
 
       <div class="stock-table-wrap">
@@ -346,12 +350,24 @@ function readInputsIntoState(){
     var idx = Number(inp.dataset.idx);
     stockMeta[idx].count = Number(inp.value) || 0;
   });
+  var apiKey = document.getElementById('in_apiKey').value.trim();
+  if (apiKey) localStorage.setItem('td_api_key', apiKey);
   return {
     fearGreed: Number(document.getElementById('in_fearGreed').value) || 0,
     krwAcc: Number(document.getElementById('in_krwAcc').value) || 0,
-    usdAcc: Number(document.getElementById('in_usdAcc').value) || 0
+    usdAcc: Number(document.getElementById('in_usdAcc').value) || 0,
+    apiKey: apiKey
   };
 }
+
+// 이전에 저장해둔 API 키가 있으면 자동으로 채워넣기
+(function restoreApiKey(){
+  var saved = localStorage.getItem('td_api_key');
+  if (saved) {
+    var el = document.getElementById('in_apiKey');
+    if (el) el.value = saved;
+  }
+})();
 
 /* ==========================================================
    2. 섹터 성과 차트
@@ -453,39 +469,51 @@ function drawSectorChart(data) {
 /* ==========================================================
    3. 실시간 가격 / 환율
    ========================================================== */
-async function fetchStockPrices(stocks) {
+async function fetchTwelveDataPrice(ticker, apiKey) {
+  try {
+    var url = 'https://api.twelvedata.com/price?symbol=' + encodeURIComponent(ticker) + '&apikey=' + encodeURIComponent(apiKey);
+    var res = await fetch(url);
+    var data = await res.json();
+    var price = parseFloat(data.price);
+    if (isNaN(price)) {
+      console.error('Twelve Data 가격 조회 실패:', ticker, data);
+      return null;
+    }
+    return price;
+  } catch (e) {
+    console.error('Twelve Data 조회 실패:', ticker, e);
+    return null;
+  }
+}
+
+async function fetchTwelveData52WeekHigh(ticker, apiKey) {
+  try {
+    var url = 'https://api.twelvedata.com/time_series?symbol=' + encodeURIComponent(ticker) + '&interval=1week&outputsize=52&apikey=' + encodeURIComponent(apiKey);
+    var res = await fetch(url);
+    var data = await res.json();
+    if (!data.values) {
+      console.error('Twelve Data 52주 시세 조회 실패:', ticker, data);
+      return null;
+    }
+    var high = data.values.reduce(function(m, v){
+      var h = parseFloat(v.high);
+      return isNaN(h) ? m : Math.max(m, h);
+    }, -Infinity);
+    return high === -Infinity ? null : high;
+  } catch (e) {
+    console.error('Twelve Data 52주 조회 실패:', ticker, e);
+    return null;
+  }
+}
+
+async function fetchStockPrices(stocks, apiKey) {
   for (var i = 0; i < stocks.length; i++) {
     var stock = stocks[i];
     try {
       if (stock.dollerYn === "Y") {
-        var url = "https://www.marketwatch.com/investing/fund/" + stock.ticker;
-        var response = await fetch(proxied(url));
-        if (!response.ok) { console.error("Failed: " + stock.ticker); continue; }
-        var text = await response.text();
-        var priceRegex = /<[a-z0-9-]+[^>]*class="[^"]*value[^"]*"[^>]*>\s*([\d,\.]+)\s*<\/[a-z0-9-]+>/i;
-        var priceMatch = text.match(priceRegex);
-        if (priceMatch) stock.price = parseFloat(priceMatch[1].replace(/,/g, ""));
-
-        if (stock.ticker === "QQQ") {
-          var parser = new DOMParser();
-          var doc = parser.parseFromString(text, "text/html");
-          var kvItems = doc.querySelectorAll("li.kv__item");
-          for (var k = 0; k < kvItems.length; k++) {
-            var item = kvItems[k];
-            var label = item.querySelector("small");
-            var value = item.querySelector("span.primary");
-            if (label && value && label.textContent.includes("52 Week Range")) {
-              var rangeText = value.textContent.trim();
-              var parts = rangeText.split(" - ");
-              if (parts.length === 2) {
-                var high = parseFloat(parts[1].replace(/,/g, ""));
-                var current = stock.price;
-                stock.dropPercentage = ((current - high) / high * 100).toFixed(2);
-              }
-              break;
-            }
-          }
-        }
+        if (!apiKey) { stock.price = stock.price || 0; continue; }
+        var price = await fetchTwelveDataPrice(stock.ticker, apiKey);
+        if (price !== null) stock.price = price;
       } else {
         var url2 = "https://finance.naver.com/item/main.nhn?code=" + stock.ticker;
         var response2 = await fetch(proxied(url2));
@@ -693,6 +721,11 @@ async function init() {
   var fearGreed = inputs.fearGreed;
   var krwAcc = inputs.krwAcc;
   var usdAcc = inputs.usdAcc;
+  var apiKey = inputs.apiKey;
+
+  if (!apiKey) {
+    status.textContent = '⚠ Twelve Data API Key를 입력해야 달러 종목 가격을 조회할 수 있습니다.';
+  }
 
   var hadgeRatio = fearGreed * 0.005;
   var agressiveRatio = 1 - hadgeRatio;
@@ -707,14 +740,13 @@ async function init() {
   drawSectorChart(sectorData);
 
   // 보유 종목 가격
-  await fetchStockPrices(stockMeta);
+  await fetchStockPrices(stockMeta, apiKey);
 
-  // QQQ 별도 조회 (탈출가격 계산용)
-  var QQQ = [
-    {"name":"QQQ","ticker":"QQQ","price":0,"dollerYn":"Y"},
-    {"name":"QLD","ticker":"QLD","price":0,"dollerYn":"Y"}
-  ];
-  await fetchStockPrices(QQQ);
+  // QQQ 52주 하락률 조회 (탈출가격 계산용, Twelve Data 사용)
+  var qqqPrice = apiKey ? await fetchTwelveDataPrice('QQQ', apiKey) : null;
+  var qqqHigh52 = apiKey ? await fetchTwelveData52WeekHigh('QQQ', apiKey) : null;
+  qqqPrice = qqqPrice || 0;
+  var qqqDrop = (qqqHigh52 && qqqHigh52 > 0) ? ((qqqPrice - qqqHigh52) / qqqHigh52 * 100).toFixed(2) : null;
 
   var exchangeRate = await fetchExchangeRate();
   var exchangeRate365 = await fetch365DayExchangeRate();
@@ -744,7 +776,10 @@ async function init() {
   document.getElementById('lastUpdated').textContent = new Date().toLocaleString('ko-KR');
 
   // 급락 케이스 리스크 조정 (기존 로직 그대로)
-  var drop = Number(QQQ[0].dropPercentage);
+  var drop = qqqDrop !== null ? Number(qqqDrop) : NaN;
+  var qldStock = stockMeta.find(function(s){ return s.ticker === 'QLD'; });
+  var qldPrice = qldStock ? qldStock.price : 0;
+
   if (isDroppedCase || drop <= -20) {
     var riskTakeRatio = drop * -2 / 100;
     for (var i = 0; i < etfRatio.length; i++) {
@@ -752,10 +787,10 @@ async function init() {
       else if (etfName[i] === "QLD") etfRatio[i] = riskTakeRatio;
       else etfRatio[i] = 0;
     }
-    var escapePrice = QQQ[1].price * 100 / (100 + (drop * 2));
+    var escapePrice = qldPrice * 100 / (100 + (drop * 2));
     document.getElementById("escape").textContent = escapePrice ? escapePrice.toFixed(2) : '-';
   } else {
-    document.getElementById("escape").textContent = QQQ[0].dropPercentage ? (QQQ[0].dropPercentage + '% (기준 미도달)') : '-';
+    document.getElementById("escape").textContent = qqqDrop ? (qqqDrop + '% (기준 미도달)') : '-';
   }
 
   // 포트폴리오 배분 차트용 목표금액 (기존 방식 유지: 전체 totalValue 기준)
@@ -809,7 +844,7 @@ async function init() {
   var reb = computeRebalance(stockMeta, etfName, etfRatio, exchangeRate, krwAcc, usdAcc, exchangeHtml, totalValue);
   renderRebalanceTable(reb.results);
 
-  status.textContent = '마지막 계산: ' + new Date().toLocaleTimeString('ko-KR');
+  status.textContent = (apiKey ? '' : '⚠ API Key 없음 — 달러 종목 가격 미조회. ') + '마지막 계산: ' + new Date().toLocaleTimeString('ko-KR');
 }
 
 /* ==========================================================
