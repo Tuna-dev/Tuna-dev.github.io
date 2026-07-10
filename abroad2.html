@@ -300,6 +300,14 @@
 
 <script>
 /* ==========================================================
+   CORS 프록시 (Cloudflare Workers)
+   ========================================================== */
+var CORS_PROXY = "https://cors-proxy.whehddnjsv.workers.dev/?url=";
+function proxied(targetUrl){
+  return CORS_PROXY + encodeURIComponent(targetUrl);
+}
+
+/* ==========================================================
    0. 종목 메타데이터 (parentTicker, 화폐, 헷지 여부)
    ========================================================== */
 var stockMeta = [
@@ -355,7 +363,7 @@ async function fetchSectorPerformance() {
     var ticker = sectorTickers[t];
     try {
       var url = "https://finviz.com/quote.ashx?t=" + ticker;
-      var response = await fetch(url);
+      var response = await fetch(proxied(url));
       var text = await response.text();
       var parser = new DOMParser();
       var doc = parser.parseFromString(text, "text/html");
@@ -451,9 +459,7 @@ async function fetchStockPrices(stocks) {
     try {
       if (stock.dollerYn === "Y") {
         var url = "https://www.marketwatch.com/investing/fund/" + stock.ticker;
-        var response = await fetch(url, {
-          headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36' }
-        });
+        var response = await fetch(proxied(url));
         if (!response.ok) { console.error("Failed: " + stock.ticker); continue; }
         var text = await response.text();
         var priceRegex = /<[a-z0-9-]+[^>]*class="[^"]*value[^"]*"[^>]*>\s*([\d,\.]+)\s*<\/[a-z0-9-]+>/i;
@@ -482,7 +488,7 @@ async function fetchStockPrices(stocks) {
         }
       } else {
         var url2 = "https://finance.naver.com/item/main.nhn?code=" + stock.ticker;
-        var response2 = await fetch(url2);
+        var response2 = await fetch(proxied(url2));
         if (!response2.ok) { stock.price = 0; continue; }
         var text2 = await response2.text();
         var priceRegex2 = /<p[^>]*class="no_today"[^>]*>[\s\S]*?<span[^>]*>([\d,]+)<\/span>/;
@@ -498,7 +504,7 @@ async function fetchStockPrices(stocks) {
 
 async function fetchExchangeRate() {
   try {
-    var response = await fetch("https://api.manana.kr/exchange/rate.json");
+    var response = await fetch(proxied("https://api.manana.kr/exchange/rate.json"));
     var data = await response.json();
     var usdToKrw = data.find(function(r){ return r.name === "USDKRW=X"; });
     return usdToKrw ? parseFloat(usdToKrw.rate) : 0;
@@ -513,7 +519,7 @@ async function fetch365DayExchangeRate() {
     var exchangeRates = [];
     for (var page = 1; page < 37; page++) {
       var url = "https://finance.naver.com/marketindex/exchangeDailyQuote.naver?marketindexCd=FX_USDKRW&page=" + page;
-      var response = await fetch(url);
+      var response = await fetch(proxied(url));
       if (!response.ok) return 0;
       var text = await response.text();
       var parser = new DOMParser();
