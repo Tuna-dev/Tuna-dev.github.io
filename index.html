@@ -1150,8 +1150,9 @@
             let totalFinancialIncome = netWithdrawal + netDividend;
             console.log("totalFinancialIncome : " +totalFinancialIncome);
             if(totalFinancialIncome > financialIncomeThreshold){
-                const healthInsurancePremium = totalFinancialIncome * (healthInsuranceRate + longTermCareRate);
-                totalFinancialIncome -= healthInsurancePremium
+                const excessIncome = totalFinancialIncome - financialIncomeThreshold;
+                const healthInsurancePremium = excessIncome * (healthInsuranceRate + longTermCareRate);
+                totalFinancialIncome -= healthInsurancePremium;
             }
             const monthlyUsableAmount = totalFinancialIncome / 12
             console.log("monthlyUsableAmount : " +monthlyUsableAmount);
@@ -1183,6 +1184,7 @@
             myChart2.data.datasets[2].data = filteredData.map(data => data.subLine);
             myChart2.data.datasets[3].data = filteredData.map(data => data.retireLimit);
             myChart2.data.datasets[4].data = filteredData.map(data => data.inflationAdjustedTarget);
+            myChart2.data.datasets[5].data = filteredData.map(data => getRetireMoney(data.subLine) / 10000.0);
 
             myChart2.update(); // 차트 업데이트
         }
