@@ -29,6 +29,27 @@
   }
   .wrap{ max-width: 1080px; margin: 0 auto; display:flex; flex-direction:column; gap:18px; }
 
+  /* ===================== 페이지 이동 네비게이션 ===================== */
+  .nav-row{
+    display:flex; justify-content:flex-end;
+  }
+  .nav-btn{
+    display:inline-flex; align-items:center; gap:6px;
+    font-family: var(--mono);
+    font-size: 12px;
+    letter-spacing: .03em;
+    color: var(--text-dim);
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: 20px;
+    padding: 7px 14px;
+    text-decoration: none;
+    transition: color .15s, border-color .15s;
+  }
+  .nav-btn:hover{ color: var(--accent); border-color: var(--accent); }
+  .nav-btn .arrow{ transition: transform .15s; }
+  .nav-btn:hover .arrow{ transform: translateX(2px); }
+
   h1{
     font-size: 15px;
     letter-spacing: .12em;
@@ -179,6 +200,9 @@
     .stat-line{ font-size: 12px; }
 
     .assump{ font-size: 10.5px; }
+
+    .nav-row{ justify-content: stretch; }
+    .nav-btn{ justify-content: center; width: 100%; }
   }
 
   @media (max-width: 400px){
@@ -191,6 +215,11 @@
 </head>
 <body>
   <div class="wrap">
+
+    <!-- 화면 이동 -->
+    <div class="nav-row">
+      <a class="nav-btn" href="index.html">목표달성률 트래킹으로 이동 <span class="arrow">→</span></a>
+    </div>
 
     <div class="top-title">
       <div>
@@ -219,7 +248,7 @@
         </div>
         <div class="field wide">
           <label>Twelve Data API Key (<a href="https://twelvedata.com/" target="_blank" style="color:var(--accent);">무료 발급</a>)</label>
-          <input type="text" id="in_apiKey" placeholder="여기에 API Key 붙여넣기">
+          <input type="text" id="in_apiKey" placeholder="여기에 API Key 붙여넣기" value="025049a7e53f4076ab98820811bdc518">
         </div>
         <div class="field wide">
           <label>리밸런싱 강도 (%) — 이론적 목표치 중 실제로 실행할 비율</label>

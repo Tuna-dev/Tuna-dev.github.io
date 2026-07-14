@@ -2,63 +2,218 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=1024, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>목표달성률 트래킹</title>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chartjs-chart-treemap"></script>
     <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-database.js"></script>
+    <!-- Tailwind: JS의 classList.toggle('hidden') 등 유틸리티 클래스 동작을 위해 유지 -->
     <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
     <style>
-        .tab-container {
-            display: flex;
-            border-bottom: 2px solid #ccc;
-        }
-        .tab {
-            padding: 10px 20px;
-            cursor: pointer;
-            border: 1px solid #ccc;
-            border-bottom: none;
-            background-color: #f9f9f9;
-        }
-        .tab.active {
-            background-color: #fff;
-            font-weight: bold;
-            border-top: 2px solid #007BFF;
-        }
-        .chart-container {
-            display: none;
-        }
-        .chart-container.active {
-            display: block;
-        }
-        span.line-border{
-            padding: 4px 8px;
-            font-size: x-small;
-            border-radius: 4px;
-            display: inline-block;
-            margin-left: 8px; 
-        }
-        span.red{
-            border: 1px solid #e60000; /* 빨간 테두리 */
-            color: #e60000; /* 글씨도 빨간색으로 */
-        }
-        span.blue{
-            border: 1px solid #007BFF; /* 파란색 테두리 */
-            color: #007BFF; /* 글씨도 파란색으로 */
-        }
+      :root{
+        --bg:        #0d1117;
+        --panel:     #141b24;
+        --panel-2:   #1b2430;
+        --line:      #26313f;
+        --text:      #dbe4ee;
+        --text-dim:  #7c8ba1;
+        --accent:    #33c9b0;   /* 매수/양수 */
+        --danger:    #f2726c;   /* 매도/음수 */
+        --warn:      #e8b04b;
+        --mono: 'SF Mono', 'IBM Plex Mono', 'Consolas', monospace;
+        --sans: -apple-system, 'Segoe UI', 'Pretendard', sans-serif;
+      }
+      *{ box-sizing: border-box; }
+      body{
+        margin:0;
+        background: var(--bg);
+        color: var(--text);
+        font-family: var(--sans);
+        padding: 28px 20px 80px;
+      }
+      .wrap{ max-width: 1080px; margin: 0 auto; display:flex; flex-direction:column; gap:18px; }
+
+      /* ===================== 페이지 이동 네비게이션 ===================== */
+      .nav-row{ display:flex; justify-content:flex-end; }
+      .nav-btn{
+        display:inline-flex; align-items:center; gap:6px;
+        font-family: var(--mono);
+        font-size: 12px;
+        letter-spacing: .03em;
+        color: var(--text-dim);
+        background: var(--panel);
+        border: 1px solid var(--line);
+        border-radius: 20px;
+        padding: 7px 14px;
+        text-decoration: none;
+        transition: color .15s, border-color .15s;
+      }
+      .nav-btn:hover{ color: var(--accent); border-color: var(--accent); }
+      .nav-btn .arrow{ transition: transform .15s; }
+      .nav-btn:hover .arrow{ transform: translateX(-2px); }
+
+      h1{
+        font-size: 15px;
+        letter-spacing: .12em;
+        text-transform: uppercase;
+        color: var(--text-dim);
+        font-weight: 600;
+        margin: 0 0 4px;
+      }
+      h2{
+        font-size: 13px;
+        letter-spacing: .08em;
+        text-transform: uppercase;
+        color: var(--text-dim);
+        font-weight: 600;
+        margin: 0 0 12px;
+      }
+      .top-title{
+        display:flex; align-items:baseline; justify-content:space-between; flex-wrap:wrap; gap:8px;
+        border-bottom: 1px solid var(--line);
+        padding-bottom: 14px;
+        margin-bottom: 4px;
+      }
+      .top-title .big{
+        font-family: var(--mono);
+        font-size: 22px;
+        color: #fff;
+        letter-spacing: -0.02em;
+      }
+      .top-title .sub{ font-size: 12px; color: var(--text-dim); }
+
+      /* ===================== 패널(카드) ===================== */
+      .panel{
+        background: var(--panel);
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        overflow: hidden;
+      }
+      .panel-toggle{
+        width: 100%;
+        text-align: left;
+        padding: 14px 20px;
+        font-size: 13px;
+        letter-spacing: .04em;
+        font-weight: 600;
+        color: var(--text);
+        background: var(--panel-2);
+        border: none;
+        border-bottom: 1px solid var(--line);
+        cursor: pointer;
+      }
+      .panel-toggle:hover{ color: var(--accent); }
+      .panel-toggle:focus{ outline: none; }
+      .panel-body{ padding: 18px 20px; }
+
+      /* ===================== 탭 (예비 스타일) ===================== */
+      .tab-container{ display:flex; border-bottom: 1px solid var(--line); }
+      .tab{
+        padding: 8px 16px; cursor: pointer;
+        border: 1px solid var(--line); border-bottom: none;
+        background: var(--panel-2); color: var(--text-dim);
+        font-size: 12.5px; border-radius: 6px 6px 0 0;
+        margin-right: 4px;
+      }
+      .tab.active{ background: var(--panel); color: var(--accent); font-weight: 700; border-color: var(--accent); }
+      .chart-container{ display: none; }
+      .chart-container.active{ display: block; }
+
+      span.line-border{
+        padding: 3px 9px;
+        font-size: 10.5px;
+        border-radius: 20px;
+        display: inline-block;
+        margin-left: 8px;
+        font-family: var(--mono);
+      }
+      span.line-border.red{ border: 1px solid var(--accent); color: var(--accent); }
+      span.line-border.blue{ border: 1px solid var(--danger); color: var(--danger); }
+
+      /* ===================== 입력 필드 ===================== */
+      .field-row{ display:flex; flex-wrap:wrap; gap: 12px 16px; align-items:flex-end; margin-bottom: 16px; }
+      .field{ display:flex; flex-direction:column; gap:5px; }
+      .field label{ font-size: 11px; color: var(--text-dim); }
+      .field input{
+        background: var(--panel-2);
+        border: 1px solid var(--line);
+        border-radius: 5px;
+        color: var(--text);
+        font-family: var(--mono);
+        font-size: 13px;
+        padding: 7px 9px;
+      }
+      .field input:focus{ outline: none; border-color: var(--accent); }
+
+      button.primary{
+        background: var(--accent);
+        color: #06231e;
+        border:none; border-radius:6px; padding:9px 18px;
+        font-weight:700; font-size:13px; cursor:pointer;
+        letter-spacing:.02em;
+      }
+      button.primary:hover{ filter: brightness(1.08); }
+
+      /* ===================== 요약 통계 라인 ===================== */
+      .stat-line{
+        display:flex; justify-content:space-between; padding:9px 0;
+        border-bottom:1px solid rgba(255,255,255,.04); font-size:13px; gap:10px;
+        flex-wrap: wrap;
+      }
+      .stat-line .k{ color: var(--text-dim); }
+      .stat-line .v{ font-family: var(--mono); text-align:right; color: var(--text); }
+
+      .chart-box{ height: 380px; position:relative; margin-bottom: 18px; }
+
+      /* ===================== 카드(매수/매도, 예비 스타일) ===================== */
+      #trade .bg-white{
+        background: var(--panel-2) !important;
+        border: 1px solid var(--line);
+      }
+      #trade .text-red-500{ color: var(--accent) !important; }
+      #trade .text-blue-500{ color: var(--danger) !important; }
+
+      @media (max-width: 640px){
+        body{ padding: 16px 12px 60px; }
+        .wrap{ gap: 14px; }
+        .top-title{ flex-direction: column; align-items: flex-start; gap: 4px; }
+        .top-title .big{ font-size: 19px; }
+        h1{ font-size: 13px; }
+        h2{ font-size: 12px; }
+        .panel-body{ padding: 14px 14px; }
+        .chart-box{ height: 260px; }
+        .field-row{ flex-direction: column; align-items: stretch; }
+        button.primary{ width: 100%; padding: 11px; }
+        .nav-row{ justify-content: stretch; }
+        .nav-btn{ justify-content: center; width: 100%; }
+      }
     </style>
 </head>
 <body>
-    <div style="width: 80%; margin: auto;">
-        
-        <div class="space-y-2">
-            <!-- <div class="border rounded shadow">
-                <button class="w-full text-left px-4 py-2 font-bold bg-gray-100 hover:bg-gray-200 focus:outline-none" onclick="toggleAccordion('chart1Content')">
+    <div class="wrap">
+
+        <!-- 화면 이동 -->
+        <div class="nav-row">
+          <a class="nav-btn" href="abroad2.html"><span class="arrow">←</span> 리밸런싱 터미널로 이동</a>
+        </div>
+
+        <div class="top-title">
+          <div>
+            <h1>Goal Tracker</h1>
+            <div class="top-title big" id="goalAchievementRate">-</div>
+            <div class="sub">목표달성률 (이전 → 현재)</div>
+          </div>
+        </div>
+
+        <div style="display:flex; flex-direction:column; gap:14px;">
+            <!-- <div class="panel">
+                <button class="panel-toggle" onclick="toggleAccordion('chart1Content')">
                     차트 1: 회사별 자금 배분 비율 및 목표 보유 갯수
                 </button>
-                <div id="chart1Content" class="px-4 py-2">
+                <div id="chart1Content" class="panel-body">
                     <div class="tab-container">
                         <div class="tab active" onclick="showTab('chart1Now')">현재차트</div>
                         <div class="tab" onclick="showTab('chart1After')">수정후 차트</div>
@@ -78,11 +233,11 @@
                     <span>종목별 목표주가 : <span id="targetPrice"></span></span>
                 </div>
             </div>
-            <div class="border rounded shadow">
-                <button class="w-full text-left px-4 py-2 font-bold bg-gray-100 hover:bg-gray-200 focus:outline-none" onclick="toggleAccordion('profitContent')">
+            <div class="panel">
+                <button class="panel-toggle" onclick="toggleAccordion('profitContent')">
                     수익탭
                 </button>
-                <div id="profitContent" class="hidden px-4 py-2">
+                <div id="profitContent" class="panel-body hidden">
                     <canvas id="profit" width="400" height="200"></canvas>
                     <div>평가 수익 : <span id="valuationAmount"></span></div>
                     <div>실현 손익 : <span id="realizedProfitLoss"></span></div>
@@ -91,21 +246,29 @@
                 </div>
             </div>
             -->
-            <div class="border rounded shadow">   
-                <button class="w-full text-left px-4 py-2 font-bold bg-gray-100 hover:bg-gray-200 focus:outline-none" onclick="toggleAccordion('chart2Content')">
+            <div class="panel">
+                <button class="panel-toggle" onclick="toggleAccordion('chart2Content')">
                     목표달성률 트래킹
                 </button>
-                <div id="chart2Content" class="hidden px-4 py-2">
-                    <canvas id="myChart2" width="400" height="200"></canvas>
-                    <p><span>목표달성률 : <span id="goalAchievementRate"></span></span></p>
-                    <p><span>기준값 대비 "<span id="goalOverPerformRate"></span>%" 초과달성 상황입니다.</span></p>
-                    <p><span>목표달성 시점 : <span id="goalAchievementDate"></span></span></p>
-                    <p><span>지금 은퇴시 월 생활비 : <span id="curRetireMoney"></span></span></p>
-                    <label for="startDate">조회 시작 날짜:</label>
-                    <input type="month" id="startDate" value="2024-01">
-                    <label for="endDate">조회 종료 날짜:</label>
-                    <input type="month" id="endDate" value="2034-12">
-                    <button onclick="updateChart()">조회</button>
+                <div id="chart2Content" class="panel-body hidden">
+                    <div class="chart-box"><canvas id="myChart2"></canvas></div>
+
+                    <div class="stat-line"><span class="k">목표달성률 (이전 → 현재)</span><span class="v" id="goalAchievementRate2Display"></span></div>
+                    <div class="stat-line"><span class="k">기준값 대비 초과달성</span><span class="v"><span id="goalOverPerformRate"></span>%</span></div>
+                    <div class="stat-line"><span class="k">목표달성 시점</span><span class="v" id="goalAchievementDate"></span></div>
+                    <div class="stat-line"><span class="k">지금 은퇴 시 월 생활비</span><span class="v" id="curRetireMoney"></span></div>
+
+                    <div class="field-row" style="margin-top:16px;">
+                        <div class="field">
+                            <label for="startDate">조회 시작 날짜</label>
+                            <input type="month" id="startDate" value="2024-01">
+                        </div>
+                        <div class="field">
+                            <label for="endDate">조회 종료 날짜</label>
+                            <input type="month" id="endDate" value="2034-12">
+                        </div>
+                        <button class="primary" onclick="updateChart()">조회</button>
+                    </div>
                 </div>
             </div>
         </div>
@@ -239,6 +402,18 @@
             }
         }
 
+
+        // ===== 차트 라인을 부드럽게(자연스러운 곡선) + 점 마커 제거 =====
+        // 데이터 포인트가 매우 많은(월별 x 70년) 라인차트라 기본 점 마커가 다닥다닥 붙어
+        // "볼록볼록"하게 보이는 문제를 해결: 점을 숨기고(hover 시만 살짝 표시),
+        // monotone cubic 보간으로 오버슈트 없는 매끈한 곡선을 그림.
+        Chart.defaults.elements.point.radius = 0;
+        Chart.defaults.elements.point.hoverRadius = 5;
+        Chart.defaults.elements.point.hitRadius = 6;
+        Chart.defaults.elements.line.borderWidth = 2;
+        Chart.defaults.elements.line.tension = 0.35;
+        Chart.defaults.elements.line.cubicInterpolationMode = 'monotone';
+        Chart.defaults.animation.duration = 500;
 
         let addingSeed = 0;
         let totalSeedBefore = 0; // 새로운 포폴에서 제거되는종목의 판매후 가격합계
@@ -768,7 +943,10 @@
             const lastBeforeData = dataset2[moneyCurveDatas.length-2];
             const goalAchievementRate = lastData.currentMoney / lastData.inflationAdjustedTarget * 100;
             const goalAchievementBeforeRate = lastBeforeData.currentMoney / lastBeforeData.inflationAdjustedTarget * 100;
-            document.getElementById("goalAchievementRate").innerText = Math.round(goalAchievementBeforeRate * 10) / 10 + "% =>"+Math.round(goalAchievementRate * 10) / 10 + "%";
+            const goalRateText = Math.round(goalAchievementBeforeRate * 10) / 10 + "% => "+Math.round(goalAchievementRate * 10) / 10 + "%";
+            document.getElementById("goalAchievementRate").innerText = goalRateText;
+            const goalRateDisplayEl = document.getElementById("goalAchievementRate2Display");
+            if (goalRateDisplayEl) goalRateDisplayEl.innerText = goalRateText;
             //기준대비 달성률(현재)
             const goalOverPerformRate = (lastData.currentMoney - lastData.targetMoney)/ lastData.targetMoney * 100;
             document.getElementById("goalOverPerformRate").innerText = Math.round(goalOverPerformRate * 10) / 10;
@@ -777,7 +955,7 @@
             //해당시점 금액
             const formatter = new Intl.NumberFormat('ko-KR', { style: 'currency', currency: 'KRW' });
             document.getElementById("curRetireMoney").innerText = formatter.format(getRetireMoney(lastData.currentMoney));
-            // Chart.js를 사용하여 두 번째 그래프 그리기
+            // Chart.js를 사용하여 두 번째 그래프 그리기 (다크 테마에 맞춘 축/범례 색상 적용)
             let ctx2 = document.getElementById('myChart2').getContext('2d');
             myChart2 = new Chart(ctx2, {
                 type: 'line',
@@ -787,51 +965,51 @@
                         {
                             label: '목표 금액',
                             data: dataset2.map(data => data.targetMoney),
-                            borderColor: 'rgba(75, 192, 192, 1)',
-                            backgroundColor: 'rgba(75, 192, 192, 0.2)',
+                            borderColor: 'rgba(51,201,176,1)',
+                            backgroundColor: 'rgba(51,201,176,0.10)',
                             fill: true,
-                            tension: 0.1
+                            borderWidth: 2.5
                         },
                         {
                             label: '현재 금액',
                             data: dataset2.map(data => data.currentMoney),
-                            borderColor: 'rgba(255, 99, 132, 1)',
-                            backgroundColor: 'rgba(255, 99, 132, 0.2)',
+                            borderColor: 'rgba(242,114,108,1)',
+                            backgroundColor: 'rgba(242,114,108,0.10)',
                             fill: true,
-                            tension: 0.1
+                            borderWidth: 2.5
                         },
                         {
                             label: '보조선',
                             data: dataset2.map(data => data.subLine),
-                            borderColor: 'rgba(255, 255, 0, 1)',
-                            backgroundColor: 'rgba(255, 255, 0, 0.2)',
-                            fill: true,
-                            tension: 0.1
+                            borderColor: 'rgba(232,176,75,1)',
+                            backgroundColor: 'transparent',
+                            fill: false,
+                            borderWidth: 2
                         },
                         {
                             label: '연금저축 한계선',
                             data: dataset2.map(data => data.retireLimit),
-                            borderColor: 'rgba(255, 0, 255, 1)',
-                            backgroundColor: 'rgba(255, 0, 255, 0.2)',
-                            fill: true,
-                            tension: 0.1
+                            borderColor: 'rgba(200,140,255,1)',
+                            backgroundColor: 'transparent',
+                            fill: false,
+                            borderWidth: 1.5
                         },
                         {
                             label: '인플레이션 감안 목표 금액',
                             data: dataset2.map(data => data.inflationAdjustedTarget),
-                            borderColor: 'rgba(54, 162, 235, 1)',
-                            backgroundColor: 'rgba(54, 162, 235, 0.2)',
-                            fill: true,
-                            tension: 0.1,
-                            borderDash: [10, 5]
+                            borderColor: 'rgba(124,139,161,1)',
+                            backgroundColor: 'transparent',
+                            fill: false,
+                            borderWidth: 1.5,
+                            borderDash: [8, 5]
                         },
                         {
                             label: '생활비',
                             data: dataset2.map(data => getRetireMoney(data.subLine)/10000.0),
-                            borderColor: 'rgba(0, 162, 235, 1)',
-                            backgroundColor: 'rgba(0, 162, 235, 0.2)',
-                            fill: true,
-                            tension: 0.1,
+                            borderColor: 'rgba(219,228,238,1)',
+                            backgroundColor: 'transparent',
+                            fill: false,
+                            borderWidth: 1.5,
                             yAxisID: 'y2'
                         }
                     ]
@@ -843,13 +1021,21 @@
                         intersect: false,
                     },
                     responsive: true,
+                    maintainAspectRatio: false,
                     scales: {
+                        x: {
+                            ticks: { color: '#7c8ba1' },
+                            grid: { color: 'rgba(255,255,255,.06)' }
+                        },
                         y: {
                             beginAtZero: false,
                             title: {
                                 display: true,
-                                text: '금액 (단위: 억)'
-                            }
+                                text: '금액 (단위: 억)',
+                                color: '#7c8ba1'
+                            },
+                            ticks: { color: '#7c8ba1' },
+                            grid: { color: 'rgba(255,255,255,.06)' }
                         },
                         y2: {
                             type: 'linear',
@@ -857,18 +1043,24 @@
                             position: 'right', 
                             title: {
                                 display: true,
-                                text: '생활비 (단위: 만원)'
+                                text: '생활비 (단위: 만원)',
+                                color: '#7c8ba1'
                             },
                             grid: {
                                 drawOnChartArea: false, 
                             },
+                            ticks: { color: '#7c8ba1' },
                             beginAtZero: true
                         }
                     },
                     plugins: {
+                        legend: {
+                            labels: { color: '#dbe4ee' }
+                        },
                         title: {
                             display: true,
-                            text: '목표달성률 트래킹'
+                            text: '목표달성률 트래킹',
+                            color: '#dbe4ee'
                         },
                         tooltip: {
                             position: 'nearest',
