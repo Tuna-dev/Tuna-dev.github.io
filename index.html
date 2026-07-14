@@ -881,7 +881,10 @@
             var targetSave = 0.03;
             var lastMoney = 1;
             var monthlyInflationRate = 1.0020593; // 월간 인플레이션 0.20593%
-            var targetFinalMoney = 8.6; // 현재기준 금액 
+            // 최종 목표금액(현재기준, 단위: 억원)
+            // 인출률 3.5% / 금융소득 과세기준 2000만원 가정 하에, 세후 월 350만원을 인출하려면
+            // 원금이 약 13.04억원 필요 (getRetireMoney 로직 역산 결과) → 8.6에서 13.04로 조정
+            var targetFinalMoney = 13.04;
             var retireLastMoney = 3.7;
 
             // 월별 인플레이션을 누적 적용하여 각 월에 목표 금액을 조정
@@ -1083,11 +1086,12 @@
             let realCurMoney = curMoney * 100000000;
             console.log("curMoney : " + realCurMoney);
             const dividendRate = 0.01;
-            const withdrawalRate = 0.04;
+            // 인출률 3.5% (기존 0.25=25%로 잘못 들어가 있던 값을 사용자 의도대로 수정)
+            const withdrawalRate = 0.035;
             const capitalGainTaxThreshold = 2500000;
             const capitalGainTaxRate = 0.22;
             const dividendTaxRate = 0.2709;
-            const financialIncomeThreshold = 10000000;
+            const financialIncomeThreshold = 20000000;
             const healthInsuranceRate = 0.0709;
             const longTermCareRate = 0.009;
             //연간인출액
