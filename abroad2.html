@@ -236,15 +236,15 @@
       <div class="input-grid">
         <div class="field">
           <label>Fear &amp; Greed Index</label>
-          <input type="number" id="in_fearGreed" min="0" max="100" value="47">
+          <input type="number" id="in_fearGreed" min="0" max="100" value="43">
         </div>
         <div class="field">
           <label>원화 예수금 (KRW)</label>
-          <input type="number" id="in_krwAcc" value="2000000">
+          <input type="number" id="in_krwAcc" value="13081">
         </div>
         <div class="field">
           <label>달러 예수금 (USD)</label>
-          <input type="number" id="in_usdAcc" value="203">
+          <input type="number" id="in_usdAcc" value="52">
         </div>
         <div class="field wide">
           <label>Twelve Data API Key (<a href="https://twelvedata.com/" target="_blank" style="color:var(--accent);">무료 발급</a>)</label>
@@ -352,14 +352,14 @@ function proxied(targetUrl){
    0. 종목 메타데이터 (parentTicker, 화폐, 헷지 여부)
    ========================================================== */
 var stockMeta = [
-  {"name":"SPY",      "ticker":"SPYM",   count:452,  dollerYn:"Y", parentTicker:"SPY", hedged:false},
-  {"name":"BND",      "ticker":"BND",    count:426,  dollerYn:"Y", parentTicker:"BND", hedged:false},
-  {"name":"EPI",      "ticker":"EPI",    count:213,  dollerYn:"Y", parentTicker:"EPI", hedged:false},
-  {"name":"LOW",      "ticker":"XLF",    count:288,  dollerYn:"Y", parentTicker:"LOW", hedged:false},
+  {"name":"SPY",      "ticker":"SPYM",   count:377,  dollerYn:"Y", parentTicker:"SPY", hedged:false},
+  {"name":"BND",      "ticker":"BND",    count:560,  dollerYn:"Y", parentTicker:"BND", hedged:false},
+  {"name":"EPI",      "ticker":"EPI",    count:176,  dollerYn:"Y", parentTicker:"EPI", hedged:false},
+  {"name":"LOW",      "ticker":"XLP",    count:175,  dollerYn:"Y", parentTicker:"LOW", hedged:false},
   {"name":"QLD",      "ticker":"QLD",    count:0,    dollerYn:"Y", parentTicker:"QLD", hedged:false},
-  {"name":"spykr",    "ticker":"379800", count:3172, dollerYn:"N", parentTicker:"SPY", hedged:false},
-  {"name":"spykr[h]", "ticker":"449180", count:2669, dollerYn:"N", parentTicker:"SPY", hedged:true},
-  {"name":"epikr",    "ticker":"453810", count:796,  dollerYn:"N", parentTicker:"EPI", hedged:false},
+  {"name":"spykr",    "ticker":"379800", count:2652+520, dollerYn:"N", parentTicker:"SPY", hedged:false},
+  {"name":"spykr[h]", "ticker":"449180", count:1347+1397, dollerYn:"N", parentTicker:"SPY", hedged:true},
+  {"name":"epikr",    "ticker":"453810", count:652+144,  dollerYn:"N", parentTicker:"EPI", hedged:false},
   {"name":"qldkr",    "ticker":"418660", count:0,    dollerYn:"N", parentTicker:"QLD", hedged:false},
   {"name":"qldkr[h]", "ticker":"409820", count:0,    dollerYn:"N", parentTicker:"QLD", hedged:true}
 ];
