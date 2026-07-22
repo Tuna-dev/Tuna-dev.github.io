@@ -219,7 +219,7 @@
                         <div class="tab" onclick="showTab('chart1After')">수정후 차트</div>
                     </div>
                 
-                    <div id="chart1Now" class="chart-container active">
+                    <div id="chart1Now" class="chart-container hidden">
                         <canvas id="myChart1_now" width="400" height="200"></canvas>
                     </div>
                     <div id="chart1After" class="chart-container">
@@ -250,7 +250,7 @@
                 <button class="panel-toggle" onclick="toggleAccordion('chart2Content')">
                     목표달성률 트래킹
                 </button>
-                <div id="chart2Content" class="panel-body hidden">
+                <div id="chart2Content" class="panel-body active">
                     <div class="chart-box"><canvas id="myChart2"></canvas></div>
 
                     <div class="stat-line"><span class="k">목표달성률 (이전 → 현재)</span><span class="v" id="goalAchievementRate2Display"></span></div>
@@ -883,7 +883,6 @@
             var monthlyInflationRate = 1.0020593; // 월간 인플레이션 0.20593%
             // 최종 목표금액(현재기준, 단위: 억원)
             // 인출률 3.5% / 금융소득 과세기준 2000만원 가정 하에, 세후 월 350만원을 인출하려면
-            // 원금이 약 13.04억원 필요 (getRetireMoney 로직 역산 결과) → 8.6에서 13.04로 조정
             var targetFinalMoney = 13.04;
             var retireLastMoney = 3.7;
 
