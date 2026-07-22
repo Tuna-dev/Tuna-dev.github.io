@@ -280,6 +280,21 @@
       <div class="chart-box"><canvas id="sectorChart"></canvas></div>
     </div>
 
+    <!-- 적응형 섹터 추천 -->
+    <div class="panel">
+      <h2>적응형 섹터 추천 (모멘텀 vs 저평가)</h2>
+      <div class="stat-line"><span class="k">시장 판단 (최근 1개월 평균)</span><span class="v" id="regimeDisp">-</span></div>
+      <div class="stat-line"><span class="k">판단 근거 (11개 섹터 1개월 평균 변화율)</span><span class="v" id="regimeBasisDisp">-</span></div>
+      <div class="stat-line"><span class="k" style="color:var(--accent);">모멘텀 1위 (최근 1년)</span><span class="v" id="momentumPickDisp">-</span></div>
+      <div class="stat-line"><span class="k" style="color:var(--warn);">저평가 1위 (최근 1년, 최하위)</span><span class="v" id="undervaluedPickDisp">-</span></div>
+      <div class="stat-line"><span class="k" style="font-weight:700;">→ 추천 섹터</span><span class="v" id="recommendedPickDisp" style="font-weight:700;">-</span></div>
+      <div class="assump">
+        ※ "모멘텀 1위"는 최근 1년 수익률(Perf Year)이 가장 높은 섹터, "저평가 1위"는 반대로 가장 낮은(많이 빠진) 섹터입니다.<br>
+        ※ 시장 판단은 11개 섹터의 최근 1개월 수익률(Perf Month) 평균이 0% 이상이면 상승장 → 모멘텀 섹터를 추천하고,
+        0% 미만이면 하락장 → 저평가 섹터를 추천합니다.
+      </div>
+    </div>
+
     <!-- 포트폴리오 배분 차트 + 전략 요약 -->
     <div class="grid-2">
       <div class="panel">
@@ -357,9 +372,9 @@ var stockMeta = [
   {"name":"EPI",      "ticker":"EPI",    count:176,  dollerYn:"Y", parentTicker:"EPI", hedged:false},
   {"name":"LOW",      "ticker":"XLP",    count:175,  dollerYn:"Y", parentTicker:"LOW", hedged:false},
   {"name":"QLD",      "ticker":"QLD",    count:0,    dollerYn:"Y", parentTicker:"QLD", hedged:false},
-  {"name":"spykr",    "ticker":"379800", count:2652+520, dollerYn:"N", parentTicker:"SPY", hedged:false},
-  {"name":"spykr[h]", "ticker":"449180", count:1347+1397, dollerYn:"N", parentTicker:"SPY", hedged:true},
-  {"name":"epikr",    "ticker":"453810", count:652+144,  dollerYn:"N", parentTicker:"EPI", hedged:false},
+  {"name":"spykr",    "ticker":"379800", count:3172, dollerYn:"N", parentTicker:"SPY", hedged:false},
+  {"name":"spykr[h]", "ticker":"449180", count:2744, dollerYn:"N", parentTicker:"SPY", hedged:true},
+  {"name":"epikr",    "ticker":"453810", count:885,  dollerYn:"N", parentTicker:"EPI", hedged:false},
   {"name":"qldkr",    "ticker":"418660", count:0,    dollerYn:"N", parentTicker:"QLD", hedged:false},
   {"name":"qldkr[h]", "ticker":"409820", count:0,    dollerYn:"N", parentTicker:"QLD", hedged:true}
 ];
@@ -410,6 +425,18 @@ function readInputsIntoState(){
 /* ==========================================================
    2. 섹터 성과 차트
    ========================================================== */
+function extractFinvizMetric(doc, label){
+  var tdElements = doc.querySelectorAll('td');
+  for (var i = 0; i < tdElements.length; i++) {
+    if (tdElements[i].textContent === label) {
+      var valueStr = tdElements[i + 1].textContent.replace('%', '').trim();
+      var v = parseFloat(valueStr);
+      return isNaN(v) ? null : v;
+    }
+  }
+  return null;
+}
+
 async function fetchSectorPerformance() {
   var results = [];
   var sectorTickers = ["XLF","XLK","XLI","XLY","XLP","XLV","XLC","XLU","XLE","XLB","XLRE"];
@@ -421,19 +448,12 @@ async function fetchSectorPerformance() {
       var text = await response.text();
       var parser = new DOMParser();
       var doc = parser.parseFromString(text, "text/html");
-      var performance = 0;
-      var tdElements = doc.querySelectorAll('td');
-      for (var i = 0; i < tdElements.length; i++) {
-        if (tdElements[i].textContent === "Perf Year") {
-          var valueStr = tdElements[i + 1].textContent.replace('%', '').trim();
-          performance = parseFloat(valueStr);
-          break;
-        }
-      }
-      results.push({ ticker: ticker, performance: performance });
+      var performance = extractFinvizMetric(doc, "Perf Year");
+      var perfMonth = extractFinvizMetric(doc, "Perf Month");
+      results.push({ ticker: ticker, performance: performance === null ? 0 : performance, perfMonth: perfMonth === null ? null : perfMonth });
     } catch (e) {
       console.error("[에러] " + ticker + " 호출 실패:", e);
-      results.push({ ticker: ticker, performance: 0 });
+      results.push({ ticker: ticker, performance: 0, perfMonth: null });
     }
   }
   return results;
@@ -443,6 +463,57 @@ var sectorDescriptions = {
   "XLF":"금융","XLK":"IT","XLI":"산업재","XLY":"임의소비재","XLP":"필수소비재",
   "XLV":"헬스케어","XLC":"커뮤니케이션","XLU":"유틸리티","XLE":"에너지","XLB":"원자재","XLRE":"부동산"
 };
+
+/* 적응형 섹터 추천: 모멘텀 1위 / 저평가 1위 산출 + 최근 1개월 평균으로 상승/하락장 판단 */
+function computeAdaptivePick(sectorData){
+  var valid = sectorData.filter(function(d){ return typeof d.performance === 'number' && !isNaN(d.performance); });
+  if (valid.length === 0) return null;
+
+  var byYearDesc = valid.slice().sort(function(a,b){ return b.performance - a.performance; });
+  var momentumPick = byYearDesc[0];
+  var undervaluedPick = byYearDesc[byYearDesc.length - 1];
+
+  var monthVals = sectorData.map(function(d){ return d.perfMonth; }).filter(function(v){ return typeof v === 'number' && !isNaN(v); });
+  var marketAvg1mo = monthVals.length > 0 ? (monthVals.reduce(function(a,b){return a+b;},0) / monthVals.length) : null;
+  var regime = (marketAvg1mo !== null && marketAvg1mo < 0) ? 'bear' : 'bull'; // 데이터 없으면 기본 상승장으로 처리
+
+  var recommended = regime === 'bull' ? momentumPick : undervaluedPick;
+
+  return {
+    momentumPick: momentumPick,
+    undervaluedPick: undervaluedPick,
+    marketAvg1mo: marketAvg1mo,
+    regime: regime,
+    recommended: recommended
+  };
+}
+
+function renderAdaptivePick(sectorData){
+  var pick = computeAdaptivePick(sectorData);
+  if (!pick) {
+    document.getElementById('regimeDisp').textContent = '데이터 부족';
+    return;
+  }
+
+  var regimeLabel = pick.regime === 'bull' ? '상승장 (모멘텀 추천)' : '하락장 (저평가 추천)';
+  document.getElementById('regimeDisp').textContent = regimeLabel;
+  document.getElementById('regimeDisp').className = 'v ' + (pick.regime === 'bull' ? 'num-pos' : 'num-neg');
+
+  document.getElementById('regimeBasisDisp').textContent =
+    pick.marketAvg1mo !== null ? (pick.marketAvg1mo >= 0 ? '+' : '') + pick.marketAvg1mo.toFixed(2) + '%' : '조회 실패 (기본값: 상승장)';
+
+  document.getElementById('momentumPickDisp').textContent =
+    pick.momentumPick.ticker + ' (' + (sectorDescriptions[pick.momentumPick.ticker] || '') + ') · ' +
+    (pick.momentumPick.performance >= 0 ? '+' : '') + pick.momentumPick.performance.toFixed(2) + '%';
+
+  document.getElementById('undervaluedPickDisp').textContent =
+    pick.undervaluedPick.ticker + ' (' + (sectorDescriptions[pick.undervaluedPick.ticker] || '') + ') · ' +
+    (pick.undervaluedPick.performance >= 0 ? '+' : '') + pick.undervaluedPick.performance.toFixed(2) + '%';
+
+  document.getElementById('recommendedPickDisp').textContent =
+    pick.recommended.ticker + ' (' + (sectorDescriptions[pick.recommended.ticker] || '') + ') — ' +
+    (pick.regime === 'bull' ? '모멘텀' : '저평가') + ' 전략';
+}
 
 var mySectorChart = null;
 function drawSectorChart(data) {
@@ -817,6 +888,7 @@ async function init() {
   // 섹터 차트
   var sectorData = await fetchSectorPerformance();
   drawSectorChart(sectorData);
+  renderAdaptivePick(sectorData);
 
   // 보유 종목 가격
   await fetchStockPrices(stockMeta, apiKey);
