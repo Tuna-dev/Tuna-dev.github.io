@@ -615,6 +615,37 @@ async function fetchTwelveData52WeekHigh(ticker, apiKey) {
   }
 }
 
+async function fetchNaverKrPrice(ticker) {
+  try {
+    var url = 'https://polling.finance.naver.com/api/realtime?query=SERVICE_ITEM:' + encodeURIComponent(ticker);
+    var res = await fetch(proxied(url));
+    if (res.ok) {
+      var data = await res.json();
+      var row = data && data.result && data.result.areas && data.result.areas[0] &&
+        data.result.areas[0].datas && data.result.areas[0].datas[0];
+      var price = parseFloat(row && (row.nv || row.pcv));
+      if (!isNaN(price) && price > 0) return price;
+    }
+  } catch (e) {
+    console.error('네이버 실시간 시세 조회 실패:', ticker, e);
+  }
+  try {
+    var chartUrl = 'https://fchart.stock.naver.com/sise.nhn?symbol=' + encodeURIComponent(ticker) +
+      '&timeframe=day&count=1&requestType=0';
+    var res2 = await fetch(proxied(chartUrl));
+    if (!res2.ok) return null;
+    var text = await res2.text();
+    var items = text.match(/data="[^"]+"/g);
+    if (!items || !items.length) return null;
+    var last = items[items.length - 1].replace(/^data="/, '').replace(/"$/, '');
+    var close = parseFloat(last.split('|')[4]);
+    return (!isNaN(close) && close > 0) ? close : null;
+  } catch (e) {
+    console.error('네이버 차트 종가 조회 실패:', ticker, e);
+    return null;
+  }
+}
+
 async function fetchStockPrices(stocks, apiKey) {
   for (var i = 0; i < stocks.length; i++) {
     var stock = stocks[i];
@@ -624,13 +655,8 @@ async function fetchStockPrices(stocks, apiKey) {
         var price = await fetchTwelveDataPrice(stock.ticker, apiKey);
         if (price !== null) stock.price = price;
       } else {
-        var url2 = "https://finance.naver.com/item/main.nhn?code=" + stock.ticker;
-        var response2 = await fetch(proxied(url2));
-        if (!response2.ok) { stock.price = 0; continue; }
-        var text2 = await response2.text();
-        var priceRegex2 = /<p[^>]*class="no_today"[^>]*>[\s\S]*?<span[^>]*>([\d,]+)<\/span>/;
-        var match2 = text2.match(priceRegex2);
-        stock.price = match2 ? parseFloat(match2[1].replace(/,/g, "")) : 0;
+        var krPrice = await fetchNaverKrPrice(stock.ticker);
+        stock.price = krPrice != null ? krPrice : 0;
       }
     } catch (e) {
       console.error("가격 조회 실패:", stock.ticker, e);
