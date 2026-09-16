@@ -261,6 +261,7 @@
           <thead>
             <tr>
               <th>종목</th>
+              <th>티커</th>
               <th>보유 수량</th>
             </tr>
           </thead>
@@ -288,10 +289,8 @@
       <div class="stat-line"><span class="k" style="color:var(--accent);">모멘텀 1위 (최근 1년)</span><span class="v" id="momentumPickDisp">-</span></div>
       <div class="stat-line"><span class="k" style="color:var(--warn);">저평가 1위 (최근 1년, 최하위)</span><span class="v" id="undervaluedPickDisp">-</span></div>
       <div class="stat-line"><span class="k" style="font-weight:700;">→ 추천 섹터</span><span class="v" id="recommendedPickDisp" style="font-weight:700;">-</span></div>
+      <div class="stat-line"><span class="k">LOW 보유 vs 추천</span><span class="v" id="lowRotateDisp">-</span></div>
       <div class="assump">
-        ※ "모멘텀 1위"는 최근 1년 수익률(Perf Year)이 가장 높은 섹터, "저평가 1위"는 반대로 가장 낮은(많이 빠진) 섹터입니다.<br>
-        ※ 시장 판단은 11개 섹터의 최근 1개월 수익률(Perf Month) 평균이 0% 이상이면 상승장 → 모멘텀 섹터를 추천하고,
-        0% 미만이면 하락장 → 저평가 섹터를 추천합니다.
       </div>
     </div>
 
@@ -308,6 +307,7 @@
         <div class="stat-line"><span class="k">실시간 환율</span><span class="v" id="fxNow">-</span></div>
         <div class="stat-line"><span class="k">365일 평균 환율</span><span class="v" id="fxAvg">-</span></div>
         <div class="stat-line"><span class="k">공포&amp;탐욕 반영 헷지비중</span><span class="v" id="hedgeRatioDisp">-</span></div>
+        <div class="stat-line"><span class="k">LOW 섹터</span><span class="v" id="lowStrategyDisp">-</span></div>
       </div>
     </div>
 
@@ -315,6 +315,7 @@
     <div class="panel">
       <h2>리밸런싱 추천 (종목별 매수/매도 수량)</h2>
       <div id="fxAlert" style="display:none; background:rgba(232,176,75,.12); border:1px solid var(--warn); border-radius:6px; padding:12px 14px; margin-bottom:14px; font-size:13px; line-height:1.6;"></div>
+      <div id="lowAlert" style="display:none; background:rgba(51,201,176,.10); border:1px solid var(--accent); border-radius:6px; padding:12px 14px; margin-bottom:14px; font-size:13px; line-height:1.6;"></div>
       <div class="stock-table-wrap">
         <table id="rebalanceTable">
           <thead>
@@ -336,14 +337,7 @@
       </div>
       <div class="assump">
         ※ 종목별 목표금액은 전체 포트폴리오(totalValue) 기준으로 먼저 계산합니다.<br>
-        ※ BND·LOW처럼 원화 상품이 없는 종목의 목표금액은 절대 깎지 않습니다 — 그 화폐 풀 전체보다 목표금액이 크면,
-        부족한 만큼 반대 화폐에서 환전해온 것으로 계산하고 위에 경고로 표시합니다. 이때 반대 화폐 쪽 유연 종목들은
-        그만큼 더 많이 매도되도록 자동 조정됩니다.<br>
-        ※ SPY·EPI·QLD처럼 양쪽 화폐 상품이 모두 있는 종목은, 현재 보유 중인 달러:원화 비율을 유지하는 방향으로 1차 배정한 뒤
-        남은 달러/원화 예산에 정확히 맞도록 비례 조정합니다.<br>
-        ※ SPY/QLD의 헷지(H)·언헷지 원화 상품 간 배분은 현재 환헷지 전략에 따라 다르게 처리됩니다 —
-        "매입" 전략은 기존 물량은 유지한 채 신규 증가분만 해당 방향으로 편입하고, "전량 전환" 전략은 반대 방향 물량 전부를 목표 방향으로 이동시킵니다.<br>
-        ※ "리밸런싱 강도"를 100%보다 낮추면, 목표금액은 그대로 두고 실제 추천 매매수량만 그 비율만큼만 실행하도록 축소합니다.
+
       </div>
     </div>
 
@@ -390,8 +384,12 @@ function renderStockInputs(){
   body.innerHTML = '';
   stockMeta.forEach(function(s, idx){
     var tr = document.createElement('tr');
+    var tickerCell = s.parentTicker === 'LOW'
+      ? '<td><input type="text" data-idx="' + idx + '" class="ticker-input" value="' + s.ticker + '" maxlength="8" style="width:72px;text-align:left;"></td>'
+      : '<td class="name" style="text-align:right;font-family:var(--mono);">' + s.ticker + '</td>';
     tr.innerHTML =
       '<td class="name">' + s.name + '<span class="ccy-badge">' + (s.dollerYn==='Y' ? 'USD' : 'KRW') + '</span></td>' +
+      tickerCell +
       '<td><input type="number" data-idx="' + idx + '" class="count-input" value="' + s.count + '"></td>';
     body.appendChild(tr);
   });
@@ -401,6 +399,14 @@ function readInputsIntoState(){
   document.querySelectorAll('.count-input').forEach(function(inp){
     var idx = Number(inp.dataset.idx);
     stockMeta[idx].count = Number(inp.value) || 0;
+  });
+  document.querySelectorAll('.ticker-input').forEach(function(inp){
+    var idx = Number(inp.dataset.idx);
+    var ticker = (inp.value || '').trim().toUpperCase();
+    if (ticker) {
+      stockMeta[idx].ticker = ticker;
+      if (stockMeta[idx].parentTicker === 'LOW') localStorage.setItem('low_held_ticker', ticker);
+    }
   });
   var apiKey = document.getElementById('in_apiKey').value.trim();
   if (apiKey) localStorage.setItem('td_api_key', apiKey);
@@ -419,6 +425,11 @@ function readInputsIntoState(){
   if (saved) {
     var el = document.getElementById('in_apiKey');
     if (el) el.value = saved;
+  }
+  var lowTicker = localStorage.getItem('low_held_ticker');
+  if (lowTicker) {
+    var low = stockMeta.find(function(s){ return s.parentTicker === 'LOW'; });
+    if (low) low.ticker = lowTicker.toUpperCase();
   }
 })();
 
@@ -488,8 +499,13 @@ function computeAdaptivePick(sectorData){
   };
 }
 
-function renderAdaptivePick(sectorData){
-  var pick = computeAdaptivePick(sectorData);
+function sectorLabel(ticker){
+  if (!ticker) return '-';
+  var desc = sectorDescriptions[ticker];
+  return desc ? ticker + ' (' + desc + ')' : ticker;
+}
+
+function renderAdaptivePick(pick, heldLowTicker){
   if (!pick) {
     document.getElementById('regimeDisp').textContent = '데이터 부족';
     return;
@@ -513,6 +529,17 @@ function renderAdaptivePick(sectorData){
   document.getElementById('recommendedPickDisp').textContent =
     pick.recommended.ticker + ' (' + (sectorDescriptions[pick.recommended.ticker] || '') + ') — ' +
     (pick.regime === 'bull' ? '모멘텀' : '저평가') + ' 전략';
+
+  var held = (heldLowTicker || '').toUpperCase();
+  var rec = (pick.recommended.ticker || '').toUpperCase();
+  var text = (!held || !rec) ? '-' : (held === rec ? '유지 · ' + sectorLabel(held) : '교체 · ' + sectorLabel(held) + ' → ' + sectorLabel(rec));
+  var rotateEl = document.getElementById('lowRotateDisp');
+  var stratEl = document.getElementById('lowStrategyDisp');
+  if (rotateEl) {
+    rotateEl.textContent = text;
+    rotateEl.className = 'v' + (held && rec && held !== rec ? ' num-neg' : '');
+  }
+  if (stratEl) stratEl.textContent = text;
 }
 
 var mySectorChart = null;
@@ -729,7 +756,7 @@ function splitHedgePair(strategy, targetTotal, currentH, currentU) {
 /* ==========================================================
    5. 리밸런싱 계산 (핵심)
    ========================================================== */
-function computeRebalance(stocks, etfNames, etfRatio, exchangeRate, krwAcc, usdAcc, hedgeStrategy, totalValue, intensity) {
+function computeRebalance(stocks, etfNames, etfRatio, exchangeRate, krwAcc, usdAcc, hedgeStrategy, totalValue, intensity, lowRotation) {
   if (typeof intensity !== 'number' || isNaN(intensity)) intensity = 1;
   var byParent = {};
   etfNames.forEach(function(n){ byParent[n] = { usd: [], krw: [] }; });
@@ -822,8 +849,31 @@ function computeRebalance(stocks, etfNames, etfRatio, exchangeRate, krwAcc, usdA
     });
   }
 
+  var recTicker = lowRotation && lowRotation.recTicker ? String(lowRotation.recTicker).toUpperCase() : '';
+  var recPrice = lowRotation && lowRotation.recPrice;
+
   etfInfo.forEach(function(e){
-    e.group.usd.forEach(function(s){ pushResult(s, e.usdTarget); });
+    if (e.name === 'LOW' && recTicker) {
+      var heldUsd = e.group.usd[0];
+      var heldTicker = heldUsd ? String(heldUsd.ticker).toUpperCase() : '';
+      if (heldTicker && heldTicker !== recTicker) {
+        e.group.usd.forEach(function(s){ pushResult(s, 0); });
+        if (e.usdTarget > 1) {
+          pushResult({
+            name: 'LOW → ' + recTicker,
+            ticker: recTicker,
+            dollerYn: 'Y',
+            price: recPrice || 0,
+            count: 0,
+            amountKRW: 0
+          }, e.usdTarget);
+        }
+      } else {
+        e.group.usd.forEach(function(s){ pushResult(s, e.usdTarget); });
+      }
+    } else {
+      e.group.usd.forEach(function(s){ pushResult(s, e.usdTarget); });
+    }
 
     if (e.group.krw.length === 1) {
       pushResult(e.group.krw[0], e.krwTarget);
@@ -837,6 +887,45 @@ function computeRebalance(stocks, etfNames, etfRatio, exchangeRate, krwAcc, usdA
   });
 
   return { results: results, usdPoolTotal: usdPoolTotal, krwPoolTotal: krwPoolTotal, fxInfo: fxInfo };
+}
+
+function renderLowAlert(lowRotation, exchangeRate, intensity) {
+  var el = document.getElementById('lowAlert');
+  if (!el) return;
+  if (!lowRotation || !lowRotation.needsRotate) {
+    el.style.display = 'none';
+    return;
+  }
+  var held = sectorLabel(lowRotation.heldTicker);
+  var rec = sectorLabel(lowRotation.recTicker);
+  var why = lowRotation.regime === 'bear' ? '하락장·저평가' : '상승장·모멘텀';
+  var sellKRW = lowRotation.heldAmountKRW || 0;
+  var sellUSD = exchangeRate > 0 ? sellKRW / exchangeRate : 0;
+  var sellShares = lowRotation.heldCount || 0;
+  if (typeof intensity === 'number') sellShares = Math.round(sellShares * intensity);
+  var buyKRW = lowRotation.targetKRW || 0;
+  var buyUSD = exchangeRate > 0 ? buyKRW / exchangeRate : 0;
+  var buyShares = (lowRotation.recPrice > 0 && buyUSD) ? Math.round((buyUSD * (intensity || 1)) / lowRotation.recPrice) : 0;
+  var recPx = lowRotation.recPrice ? lowRotation.recPrice.toLocaleString(undefined,{maximumFractionDigits:2}) : '-';
+  var heldPx = lowRotation.heldPrice ? lowRotation.heldPrice.toLocaleString(undefined,{maximumFractionDigits:2}) : '-';
+  var buyLine;
+  if (buyKRW <= 1) {
+    buyLine = '추천 ' + rec + ' 매수 없음 (LOW 슬리브 목표 0)';
+  } else {
+    buyLine = '추천 ' + rec + ' ' + (buyShares ? ('+' + buyShares.toLocaleString() + '주') : '수량 미산출') +
+      ' 매수 @ $' + recPx +
+      ' (목표 ≈ ' + Math.round(buyKRW).toLocaleString() + '원 / $' + buyUSD.toFixed(0) + ')';
+  }
+  var msg = '<b>LOW 섹터 교체 (' + why + ')</b><br>' +
+    '보유 ' + held + ' ' + sellShares.toLocaleString() + '주 매도 @ $' + heldPx +
+    ' (≈ ' + Math.round(sellKRW).toLocaleString() + '원 / $' + sellUSD.toFixed(0) + ')<br>' +
+    buyLine + '<br>' +
+    '아래 표에도 동일하게 표시됩니다. 체결 후 입력표 LOW 티커를 ' + (lowRotation.recTicker || '') + '로 바꿔 주세요.';
+  if (!lowRotation.recPrice) {
+    msg += '<br>⚠ 추천 종목 현재가 조회에 실패해 매수 수량을 계산하지 못했습니다. API Key와 티커를 확인하세요.';
+  }
+  el.innerHTML = msg;
+  el.style.display = 'block';
 }
 
 function renderFxAlert(fxInfo, exchangeRate) {
@@ -872,7 +961,9 @@ function renderRebalanceTable(results) {
     var moveClass = r.moveKRW >= 0 ? 'num-pos' : 'num-neg';
     var tr = document.createElement('tr');
     tr.innerHTML =
-      '<td class="name">' + r.name + '<span class="ccy-badge">' + (r.dollerYn === 'Y' ? 'USD' : 'KRW') + '</span></td>' +
+      '<td class="name">' + r.name +
+      (r.ticker ? '<span class="ccy-badge">' + r.ticker + '</span>' : '') +
+      '<span class="ccy-badge">' + (r.dollerYn === 'Y' ? 'USD' : 'KRW') + '</span></td>' +
       '<td>' + (r.price ? r.price.toLocaleString(undefined,{maximumFractionDigits:2}) : '-') + '</td>' +
       '<td>' + r.count.toLocaleString() + '</td>' +
       '<td>' + Math.round(r.amountKRW).toLocaleString() + '</td>' +
@@ -914,10 +1005,19 @@ async function init() {
   // 섹터 차트
   var sectorData = await fetchSectorPerformance();
   drawSectorChart(sectorData);
-  renderAdaptivePick(sectorData);
+  var pick = computeAdaptivePick(sectorData);
+  var lowStock = stockMeta.find(function(s){ return s.parentTicker === 'LOW'; });
+  renderAdaptivePick(pick, lowStock ? lowStock.ticker : '');
 
   // 보유 종목 가격
   await fetchStockPrices(stockMeta, apiKey);
+
+  var recTicker = pick && pick.recommended ? String(pick.recommended.ticker).toUpperCase() : '';
+  var heldLowTicker = lowStock ? String(lowStock.ticker).toUpperCase() : '';
+  var recPrice = null;
+  if (recTicker && heldLowTicker && recTicker !== heldLowTicker && apiKey) {
+    recPrice = await fetchTwelveDataPrice(recTicker, apiKey);
+  }
 
   // QQQ 52주 하락률 조회 (탈출가격 계산용, Twelve Data 사용)
   var qqqPrice = apiKey ? await fetchTwelveDataPrice('QQQ', apiKey) : null;
@@ -1018,9 +1118,22 @@ async function init() {
   document.getElementById("change").innerHTML = changeHtml.replace(/\n/g,'<br>');
 
   // ===== 종목별 실제 매수/매도 수량 계산 (화폐군 분리) =====
-  var reb = computeRebalance(stockMeta, etfName, etfRatio, exchangeRate, krwAcc, usdAcc, exchangeHtml, totalValue, inputs.intensity);
+  var lowTargetKRW = totalValue * (etfRatio[etfName.indexOf('LOW')] || 0);
+  var lowRotation = {
+    heldTicker: heldLowTicker,
+    recTicker: recTicker,
+    recPrice: recPrice,
+    heldPrice: lowStock ? lowStock.price : 0,
+    heldCount: lowStock ? lowStock.count : 0,
+    heldAmountKRW: lowStock ? (lowStock.count * (lowStock.price || 0) * exchangeRate) : 0,
+    targetKRW: lowTargetKRW,
+    regime: pick ? pick.regime : 'bull',
+    needsRotate: !!(recTicker && heldLowTicker && recTicker !== heldLowTicker)
+  };
+  var reb = computeRebalance(stockMeta, etfName, etfRatio, exchangeRate, krwAcc, usdAcc, exchangeHtml, totalValue, inputs.intensity, lowRotation);
   renderRebalanceTable(reb.results);
   renderFxAlert(reb.fxInfo, exchangeRate);
+  renderLowAlert(lowRotation, exchangeRate, inputs.intensity);
 
   status.textContent = (apiKey ? '' : '⚠ API Key 없음 — 달러 종목 가격 미조회. ') + '마지막 계산: ' + new Date().toLocaleTimeString('ko-KR');
 }
