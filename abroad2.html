@@ -303,7 +303,7 @@
       <div class="panel">
         <h2>전략 요약</h2>
         <div class="stat-line"><span class="k">환헷지 전략</span><span class="v" id="exchange">-</span></div>
-        <div class="stat-line"><span class="k">탈출 가격 (QQQ)</span><span class="v" id="escape">-</span></div>
+        <div class="stat-line"><span class="k">탈출 가격 (QLD 52주 고점)</span><span class="v" id="escape">-</span></div>
         <div class="stat-line"><span class="k">실시간 환율</span><span class="v" id="fxNow">-</span></div>
         <div class="stat-line"><span class="k">365일 평균 환율</span><span class="v" id="fxAvg">-</span></div>
         <div class="stat-line"><span class="k">공포&amp;탐욕 반영 헷지비중</span><span class="v" id="hedgeRatioDisp">-</span></div>
@@ -374,7 +374,34 @@ var stockMeta = [
 ];
 
 var etfName = ['SPY', 'BND', 'EPI', 'LOW', 'QLD'];
-var isDroppedCase = false;
+var DROPPED_ACTIVE_KEY = 'abroad2_dropped_active';
+var DROPPED_HIGH_KEY = 'abroad2_dropped_qqq_high';
+
+function hasQldPosition() {
+  return stockMeta.some(function(s) {
+    return s.parentTicker === 'QLD' && Number(s.count) > 0;
+  });
+}
+
+function readDroppedPeak() {
+  if (localStorage.getItem(DROPPED_ACTIVE_KEY) !== '1') return null;
+  var high = parseFloat(localStorage.getItem(DROPPED_HIGH_KEY));
+  return high > 0 ? high : null;
+}
+
+function saveDroppedPeak(high) {
+  localStorage.setItem(DROPPED_ACTIVE_KEY, '1');
+  localStorage.setItem(DROPPED_HIGH_KEY, String(high));
+}
+
+function clearDroppedPeak() {
+  localStorage.removeItem(DROPPED_ACTIVE_KEY);
+  localStorage.removeItem(DROPPED_HIGH_KEY);
+}
+
+function dropPct(price, high) {
+  return Number((((price - high) / high) * 100).toFixed(2));
+}
 
 /* ==========================================================
    1. 입력 패널 렌더링 / 값 읽기
@@ -1024,11 +1051,11 @@ async function init() {
     recPrice = await fetchTwelveDataPrice(recTicker, apiKey);
   }
 
-  // QQQ 52주 하락률 조회 (탈출가격 계산용, Twelve Data 사용)
+  // QQQ 현재가·52주 고점이 둘 다 있을 때만 하락률을 쓴다. QLD 52주 고점은 탈출가로 표시한다.
   var qqqPrice = apiKey ? await fetchTwelveDataPrice('QQQ', apiKey) : null;
   var qqqHigh52 = apiKey ? await fetchTwelveData52WeekHigh('QQQ', apiKey) : null;
-  qqqPrice = qqqPrice || 0;
-  var qqqDrop = (qqqHigh52 && qqqHigh52 > 0) ? ((qqqPrice - qqqHigh52) / qqqHigh52 * 100).toFixed(2) : null;
+  var qldHigh52 = apiKey ? await fetchTwelveData52WeekHigh('QLD', apiKey) : null;
+  var qqqDataOk = qqqPrice > 0 && qqqHigh52 > 0;
 
   var exchangeRate = await fetchExchangeRate();
   var exchangeRate365 = await fetch365DayExchangeRate();
@@ -1057,22 +1084,45 @@ async function init() {
   document.getElementById('totalValueDisplay').textContent = '₩ ' + Math.round(totalValue).toLocaleString();
   document.getElementById('lastUpdated').textContent = new Date().toLocaleString('ko-KR');
 
-  // 급락 케이스 리스크 조정 (기존 로직 그대로)
-  var drop = qqqDrop !== null ? Number(qqqDrop) : NaN;
-  var qldStock = stockMeta.find(function(s){ return s.ticker === 'QLD'; });
-  var qldPrice = qldStock ? qldStock.price : 0;
+  // 급락: QQQ -20%에서 진입하고, 그때의 전고점 회복 + QLD 잔고 0일 때 해제
+  var heldQld = hasQldPosition();
+  var isDroppedCase = false;
+  var drop = NaN;
 
-  if (isDroppedCase || drop <= -20) {
+  if (!qqqDataOk) {
+    document.getElementById("escape").textContent = '하락률 조회 실패';
+  } else {
+    var rollingDrop = dropPct(qqqPrice, qqqHigh52);
+    var refHigh = readDroppedPeak();
+
+    if (!refHigh && (rollingDrop <= -20 || heldQld)) {
+      refHigh = qqqHigh52;
+      saveDroppedPeak(refHigh);
+    }
+
+    if (refHigh && qqqPrice >= refHigh && !heldQld) {
+      clearDroppedPeak();
+      refHigh = null;
+    }
+
+    if (refHigh) {
+      isDroppedCase = true;
+      drop = qqqPrice >= refHigh ? 0 : dropPct(qqqPrice, refHigh);
+      document.getElementById("escape").textContent = qldHigh52 > 0
+        ? qldHigh52.toFixed(2)
+        : 'QLD 고점 조회 실패';
+    } else {
+      document.getElementById("escape").textContent = rollingDrop.toFixed(2) + '% (기준 미도달)';
+    }
+  }
+
+  if (isDroppedCase) {
     var riskTakeRatio = drop * -2 / 100;
     for (var i = 0; i < etfRatio.length; i++) {
       if (etfName[i] === "SPY") etfRatio[i] = 1 - riskTakeRatio;
       else if (etfName[i] === "QLD") etfRatio[i] = riskTakeRatio;
       else etfRatio[i] = 0;
     }
-    var escapePrice = qldPrice * 100 / (100 + (drop * 2));
-    document.getElementById("escape").textContent = escapePrice ? escapePrice.toFixed(2) : '-';
-  } else {
-    document.getElementById("escape").textContent = qqqDrop ? (qqqDrop + '% (기준 미도달)') : '-';
   }
 
   // 포트폴리오 배분 차트용 목표금액 (기존 방식 유지: 전체 totalValue 기준)
