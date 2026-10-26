@@ -236,15 +236,15 @@
       <div class="input-grid">
         <div class="field">
           <label>Fear &amp; Greed Index</label>
-          <input type="number" id="in_fearGreed" min="0" max="100" value="32">
+          <input type="number" id="in_fearGreed" min="0" max="100" value="21">
         </div>
         <div class="field">
           <label>원화 예수금 (KRW)</label>
-          <input type="number" id="in_krwAcc" value="2510762">
+          <input type="number" id="in_krwAcc" value="18407">
         </div>
         <div class="field">
           <label>달러 예수금 (USD)</label>
-          <input type="number" id="in_usdAcc" value="479.8">
+          <input type="number" id="in_usdAcc" value="33.66">
         </div>
         <div class="field wide">
           <label>Twelve Data API Key (<a href="https://twelvedata.com/" target="_blank" style="color:var(--accent);">무료 발급</a>)</label>
@@ -361,43 +361,19 @@ function proxied(targetUrl){
    0. 종목 메타데이터 (parentTicker, 화폐, 헷지 여부)
    ========================================================== */
 var stockMeta = [
-  {"name":"SPY",      "ticker":"SPYM",   count:434,  dollerYn:"Y", parentTicker:"SPY", hedged:false},
-  {"name":"BND",      "ticker":"BND",    count:402,  dollerYn:"Y", parentTicker:"BND", hedged:false},
-  {"name":"EPI",      "ticker":"EPI",    count:295,  dollerYn:"Y", parentTicker:"EPI", hedged:false},
-  {"name":"LOW",      "ticker":"XLY",    count:146,  dollerYn:"Y", parentTicker:"LOW", hedged:false},
+  {"name":"SPY",      "ticker":"SPYM",   count:399,  dollerYn:"Y", parentTicker:"SPY", hedged:false},
+  {"name":"BND",      "ticker":"BND",    count:456,  dollerYn:"Y", parentTicker:"BND", hedged:false},
+  {"name":"EPI",      "ticker":"EPI",    count:278,  dollerYn:"Y", parentTicker:"EPI", hedged:false},
+  {"name":"LOW",      "ticker":"XLE",    count:243,  dollerYn:"Y", parentTicker:"LOW", hedged:false},
   {"name":"QLD",      "ticker":"QLD",    count:0,    dollerYn:"Y", parentTicker:"QLD", hedged:false},
-  {"name":"spykr",    "ticker":"379800", count:5594, dollerYn:"N", parentTicker:"SPY", hedged:false},
+  {"name":"spykr",    "ticker":"379800", count:5675, dollerYn:"N", parentTicker:"SPY", hedged:false},
   {"name":"spykr[h]", "ticker":"449180", count:0, dollerYn:"N", parentTicker:"SPY", hedged:true},
-  {"name":"epikr",    "ticker":"453810", count:576, dollerYn:"N", parentTicker:"EPI", hedged:false},
+  {"name":"epikr",    "ticker":"453810", count:630, dollerYn:"N", parentTicker:"EPI", hedged:false},
   {"name":"qldkr",    "ticker":"418660", count:0,    dollerYn:"N", parentTicker:"QLD", hedged:false},
   {"name":"qldkr[h]", "ticker":"409820", count:0,    dollerYn:"N", parentTicker:"QLD", hedged:true}
 ];
 
 var etfName = ['SPY', 'BND', 'EPI', 'LOW', 'QLD'];
-var DROPPED_ACTIVE_KEY = 'abroad2_dropped_active';
-var DROPPED_HIGH_KEY = 'abroad2_dropped_qqq_high';
-
-function hasQldPosition() {
-  return stockMeta.some(function(s) {
-    return s.parentTicker === 'QLD' && Number(s.count) > 0;
-  });
-}
-
-function readDroppedPeak() {
-  if (localStorage.getItem(DROPPED_ACTIVE_KEY) !== '1') return null;
-  var high = parseFloat(localStorage.getItem(DROPPED_HIGH_KEY));
-  return high > 0 ? high : null;
-}
-
-function saveDroppedPeak(high) {
-  localStorage.setItem(DROPPED_ACTIVE_KEY, '1');
-  localStorage.setItem(DROPPED_HIGH_KEY, String(high));
-}
-
-function clearDroppedPeak() {
-  localStorage.removeItem(DROPPED_ACTIVE_KEY);
-  localStorage.removeItem(DROPPED_HIGH_KEY);
-}
 
 function dropPct(price, high) {
   return Number((((price - high) / high) * 100).toFixed(2));
@@ -1084,35 +1060,23 @@ async function init() {
   document.getElementById('totalValueDisplay').textContent = '₩ ' + Math.round(totalValue).toLocaleString();
   document.getElementById('lastUpdated').textContent = new Date().toLocaleString('ko-KR');
 
-  // 급락: QQQ -20%에서 진입하고, 그때의 전고점 회복 + QLD 잔고 0일 때 해제
-  var heldQld = hasQldPosition();
+  // 급락: 계산할 때마다 현재 QQQ 52주 고점 대비 현재가가 -20% 이하인지 비교
+  localStorage.removeItem('abroad2_dropped_active');
+  localStorage.removeItem('abroad2_dropped_qqq_high');
   var isDroppedCase = false;
   var drop = NaN;
 
   if (!qqqDataOk) {
     document.getElementById("escape").textContent = '하락률 조회 실패';
   } else {
-    var rollingDrop = dropPct(qqqPrice, qqqHigh52);
-    var refHigh = readDroppedPeak();
-
-    if (!refHigh && (rollingDrop <= -20 || heldQld)) {
-      refHigh = qqqHigh52;
-      saveDroppedPeak(refHigh);
-    }
-
-    if (refHigh && qqqPrice >= refHigh && !heldQld) {
-      clearDroppedPeak();
-      refHigh = null;
-    }
-
-    if (refHigh) {
-      isDroppedCase = true;
-      drop = qqqPrice >= refHigh ? 0 : dropPct(qqqPrice, refHigh);
+    drop = dropPct(qqqPrice, qqqHigh52);
+    isDroppedCase = drop <= -20;
+    if (isDroppedCase) {
       document.getElementById("escape").textContent = qldHigh52 > 0
         ? qldHigh52.toFixed(2)
         : 'QLD 고점 조회 실패';
     } else {
-      document.getElementById("escape").textContent = rollingDrop.toFixed(2) + '% (기준 미도달)';
+      document.getElementById("escape").textContent = drop.toFixed(2) + '% (기준 미도달)';
     }
   }
 
